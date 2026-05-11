@@ -1,0 +1,126 @@
+{
+  "brand": {
+    "name": "ABPT",
+    "tagline": "bruddatrain",
+    "domain": "apt_train.ie",
+    "vibe": "Simplistic blend of green, encouraging, fresh, and functional"
+  },
+  "theme_and_archetype": {
+    "archetype": "Archetype 1: Organic & Earthy (Modified for Fitness)",
+    "theme": "Light",
+    "reasoning": "The user requested a simplistic blend of green and an encouraging vibe. Archetype 1 provides the grounded, healthy, and fresh aesthetic needed for meal prep, while bright green accents will inject the fitness/encouragement energy needed for 'bruddatrain'."
+  },
+  "colors": {
+    "background": "#FCFDFB",
+    "surface": "#FFFFFF",
+    "surface_muted": "#F3F7F4",
+    "primary": "#10B981",
+    "primary_hover": "#059669",
+    "primary_foreground": "#FFFFFF",
+    "brand_dark": "#1A3622",
+    "text_main": "#111C15",
+    "text_muted": "#5C7063",
+    "border": "#E5EFE8",
+    "accent_warm": "#E07A5F",
+    "danger": "#EF4444"
+  },
+  "typography": {
+    "font_families": {
+      "headings": "Outfit, sans-serif",
+      "body": "Manrope, sans-serif"
+    },
+    "scale": {
+      "h1": "text-5xl lg:text-6xl tracking-tight font-bold",
+      "h2": "text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl lg:text-2xl font-medium",
+      "body": "text-base leading-relaxed",
+      "label": "text-sm uppercase tracking-[0.1em] font-medium"
+    },
+    "rules": [
+      "Headings must use tight letter spacing (-0.02em to -0.04em).",
+      "Avoid pure black for text; use #111C15 to maintain the earthy tint.",
+      "Use text-muted (#5C7063) for secondary descriptions to establish hierarchy."
+    ]
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing Philosophy. Use expansive padding to let the simplistic UI breathe.",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "grid_system": "Bento-style grids for the weekly menu. Wide gaps (gap-6 or gap-8).",
+    "borders": "Flat solid surfaces with subtle 1px borders (border-[#E5EFE8]). No heavy drop shadows. Use shadow-sm for cards."
+  },
+  "ui_components": {
+    "buttons": {
+      "primary": "bg-[#10B981] text-white rounded-md px-6 py-3 font-semibold transition-all hover:bg-[#059669] hover:-translate-y-0.5",
+      "secondary": "bg-[#F3F7F4] text-[#1A3622] rounded-md px-6 py-3 font-medium transition-all hover:bg-[#E5EFE8]"
+    },
+    "cards": {
+      "style": "bg-white border border-[#E5EFE8] rounded-xl overflow-hidden shadow-sm"
+    },
+    "inputs_and_auth": {
+      "4_digit_input": "flex justify-center gap-4. Each input: w-16 h-20 text-center text-3xl font-bold rounded-lg border-2 border-[#E5EFE8] focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/20 outline-none transition-all",
+      "general_input": "w-full rounded-md border border-[#E5EFE8] px-4 py-3 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981] outline-none"
+    },
+    "navigation": {
+      "header": "Sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#E5EFE8]"
+    }
+  },
+  "media": {
+    "hero_image": {
+      "url": "https://images.pexels.com/photos/5794779/pexels-photo-5794779.jpeg",
+      "description": "Healthy vegetables stored in plastic containers for fresh and nutritious meals. Use as hero image on landing page.",
+      "category": "hero"
+    },
+    "trainer_vibe": {
+      "url": "https://images.unsplash.com/photo-1758875568932-0eefd3e60090?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDZ8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwZml0bmVzcyUyMHRyYWluZXIlMjBzbWlsaW5nfGVufDB8fHx8MTc3ODUyMjc4NXww&ixlib=rb-4.1.0&q=85",
+      "description": "Man with arms crossed in a gym. Represents the 'bruddatrain' brand persona.",
+      "category": "about"
+    },
+    "recipe_chicken_bowl": {
+      "url": "https://images.unsplash.com/photo-1775039983749-aa6003c8ecf9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwyfHxjaGlja2VuJTIwc3RpciUyMGZyeSUyMGJvd2x8ZW58MHx8fHwxNzc4NTIyNzg1fDA&ixlib=rb-4.1.0&q=85",
+      "description": "A bowl of rice topped with glazed chicken and vegetables. Use for recipe thumbnails.",
+      "category": "product"
+    },
+    "ingredients_prep": {
+      "url": "https://images.unsplash.com/photo-1760445529672-c7b301529d61?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwbWVhbCUyMHByZXAlMjBmcmVzaCUyMGluZ3JlZGllbnRzfGVufDB8fHx8MTc3ODUyMjc4NXww&ixlib=rb-4.1.0&q=85",
+      "description": "Hands arranging fresh ingredients. Use for the shopping list or weekly menu header.",
+      "category": "background"
+    }
+  },
+  "page_structures": {
+    "landing_page": {
+      "sections": [
+        "Hero: Brand Name (ABPT), Tagline (bruddatrain), encouraging H1, CTA 'Access Weekly Plan', Hero image.",
+        "How It Works: 3 simple steps (Register, Get Weekly Plan, Prep & Eat).",
+        "Auth Section: Client self-registration form OR 4-digit code login."
+      ]
+    },
+    "client_dashboard": {
+      "sections": [
+        "Header: Greeting, Countdown to code expiry, Profile Access.",
+        "Weekly Menu: Mon-Sun Grid (Bento style). Each day shows Breakfast, Lunch, Dinner.",
+        "Actions: Prominent 'Download PDF (Plan + Recipes + Shopping List)' button.",
+        "Shopping List: Clean, cardless checklist format auto-generated from the week's meals."
+      ]
+    },
+    "recipe_view": {
+      "layout": "2-column layout on desktop. Left: Large image + instructions. Right: Ingredient list with checkboxes."
+    },
+    "admin_panel": {
+      "sections": [
+        "Client Management: Table of clients, current 4-digit codes, remove action.",
+        "Menu Generator: Interface to set/rotate the Mon-Sun meals and regenerate the shopping list."
+      ]
+    }
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure primary CTA (#10B981) has accessible white text. Focus states must use ring-2 focus:ring-[#10B981].",
+    "data_testid": "All interactive elements MUST include data-testid attribute. (e.g., data-testid='login-submit-btn', data-testid='download-pdf-btn')."
+  },
+  "instructions_to_main_agent": [
+    "Install and use 'lucide-react' for all icons.",
+    "Use Shadcn UI for forms, dialogs, and inputs, but customize the styling to match the flat/subtle border aesthetic described above.",
+    "Do not use generic 'Inter' font. Import and configure 'Outfit' for headings and 'Manrope' for body.",
+    "Ensure the PDF generation combines the plan, recipes, and shopping list cleanly. Consider using libraries like 'jspdf' and 'html2canvas' or '@react-pdf/renderer'.",
+    "Implement the 4-digit auth system cleanly, restricting access to the dashboard unless a valid, non-expired code is present."
+  ]
+}
