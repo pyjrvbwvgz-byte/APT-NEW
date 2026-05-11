@@ -1,0 +1,31 @@
+{
+  "summary": "Full backend + frontend testing for ABPT meal prep app. Backend: 23/23 pytest tests passed covering auth (register/login/me/refresh-code), recipes (list/get/404), menu (current/shopping-list with de-dup), admin (login/clients/regen/remove/menu update). Frontend: landing page (ABPT/bruddatrain/How it works) renders; auth Register tab ('New here') creates client and displays 4-digit access code (e.g. 2057) with 'Go to my plan' button; dashboard PDF download works (file 'ABPT-MealPlan-2026-05-11.pdf' downloaded); admin login with 'abpt2025' loads control panel showing Clients list and weekly menu editor (Mon-Sun, Breakfast/Lunch/Dinner selects, Save menu button).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin menu editor", "issues": ["React warning: 'Select is changing from uncontrolled to controlled' fires ~21 times when admin menu loads — caused by Select components initialized with undefined value before menu fetch resolves. Defensive default (value || '') would silence."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: Initialize admin menu Select components with empty-string defaults to avoid 'uncontrolled to controlled' React warning.",
+    "Note: spec text says 'GET /api/recipes/meal-prep-pro-19' but that is the preview host slug; actual recipe slugs are e.g. 'breakfast-bagel'. Endpoint works with valid slugs and 404s otherwise."
+  ],
+  "critical_code_review_comments": [
+    "FastAPI @app.on_event('startup'/'shutdown') are deprecated; consider lifespan handler.",
+    "Auth token is plaintext '<id>:<code>' — fine for this MVP but stateful sessions / JWT would be more robust; tokens are revalidated on every request against Mongo so reasonable.",
+    "Shopping-list aggregation correctly groups by (name.lower(), unit.lower()); de-dup verified in tests.",
+    "Admin password defaults to 'abpt2025' hardcoded; acceptable since env override supported.",
+    "All endpoints exclude Mongo _id via projections; no ObjectId leakage.",
+    "CORS allow_origins='*' with allow_credentials=True is technically invalid per CORS spec — browsers will ignore credentials. Acceptable here since auth uses Bearer headers, not cookies."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin password: abpt2025. Test clients created on the fly via /api/auth/register (TEST_ prefix, cleaned up).",
+  "seed_data_creation": "Tests register transient TEST_* clients and clean them via /api/admin/clients DELETE at end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/backend_test.py is the regression suite (run: pytest /app/backend/tests/backend_test.py). All 23 cases pass. Frontend auth flow: Register tab is labelled 'New here', Login tab 'I have a code'. After register the user sees an access-code reveal screen and must click 'Go to my plan' to reach /dashboard. PDF download verified via expect_download — filename pattern ABPT-MealPlan-YYYY-MM-DD.pdf."
+}
