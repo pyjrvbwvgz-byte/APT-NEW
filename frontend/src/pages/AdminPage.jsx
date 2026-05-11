@@ -287,7 +287,7 @@ function AdminDashboard({ onLogout }) {
                       {["breakfast", "lunch", "dinner"].map((meal) => (
                         <td key={meal} className="p-3">
                           <Select
-                            value={menu?.days?.[day]?.[meal]}
+                            value={menu?.days?.[day]?.[meal] || ""}
                             onValueChange={(v) => updateMenuSlot(day, meal, v)}
                           >
                             <SelectTrigger
