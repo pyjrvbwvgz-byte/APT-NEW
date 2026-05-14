@@ -1,0 +1,33 @@
+{
+  "summary": "Backend-only regression run for ABPT meal-prep Stripe fix. 31/31 pytest passed (100%). Critical /api/payments/checkout/status 500 regression is FIXED — endpoint now returns HTTP 200 + payment_status='pending' even when emergentintegrations Stripe sandbox raises 'No such checkout.session'. Idempotency, 404 for unknown sessions, webhook_url persistence on payment_transactions, and webhook short-circuit (granted=True ⇒ paid+client+token without Stripe call) all verified. New POST /api/webhook/stripe endpoint exists and returns HTTP 400 for empty/invalid signatures (not 404). All previously-passing endpoints (pricing, admin auth, admin clients CRUD, rotate-codes, code login, recipes, menu, shopping-list, checkout creation) still pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/payments/checkout/status/{session_id}", "issue": "When tx.granted=True short-circuit branch fires, the response includes client and token keys, but token is the just-generated client subscription_token only if _grant_subscription has been called. The current short-circuit returns token=`<client_id>:<subscription_token>` BUT subscription_token may be empty string if granted was flipped manually without calling _grant_subscription (i.e. via the webhook path the token IS populated; via direct DB flip in tests it is empty). Not a bug in the fix — actual webhook delivery sets granted via _grant_subscription so token is populated correctly. Documenting for completeness."},
+      {"endpoint": "POST /api/webhook/stripe", "issue": "Endpoint logs warning and returns 400 on invalid signature — good. Suggest also logging the event-id on success path for traceability."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "checkout_status try/except correctly swallows emergentintegrations CheckoutError and returns cached tx state — regression resolved.",
+    "_grant_subscription uses single-writer mongo update {granted:{$ne:true}} + modified_count check → idempotent webhook delivery is safe.",
+    "POST /api/webhook/stripe always uses StripeCheckout(webhook_url='') — that's OK because handle_webhook only needs api_key + signature; just confirm emergentintegrations doesn't require webhook_url for sig verification.",
+    "Short-circuit branch returns token=`{id}:{subscription_token}` — if granted was set via webhook through _grant_subscription, this is correct. If granted is ever set externally without _grant_subscription, token will be `{id}:` (empty). Consider asserting subscription_token is set inside the short-circuit, or call _grant_subscription unconditionally when granted=True but subscription_token missing.",
+    "weekly_rotation_loop spawned via @app.on_event('startup') — prefer FastAPI lifespan handler (cosmetic).",
+    "STRIPE_API_KEY default 'sk_test_emergent' hardcoded as fallback — fine for sandbox but consider failing fast in production if missing."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "not retested (was 100% in iteration_2)"},
+  "test_credentials": "Admin password: abpt2025. Client codes admin-issued via /api/admin/clients.",
+  "seed_data_creation": "Tests create temporary test_*@example.com clients and payment_transactions via /api/payments/checkout; all cleaned up on teardown. One test directly mutates payment_transactions.granted via pymongo to verify the short-circuit branch.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=<url> pytest /app/backend/tests/backend_test.py -v. 31 tests, ~8s. New regression coverage: TestPayments::test_checkout_status_returns_pending_not_500, ::test_checkout_status_idempotent_pending, ::test_status_unknown_session_returns_404, ::test_checkout_creates_tx_with_webhook_url, ::test_status_short_circuits_when_granted, TestStripeWebhook::test_webhook_endpoint_exists_rejects_invalid, ::test_webhook_invalid_body_rejected. The last two confirm POST /api/webhook/stripe is reachable and returns 400 (not 404) on bad signature.",
+  "rca of the issue": "Previous 500 root cause: emergentintegrations.payments.stripe.checkout.get_checkout_status raised CheckoutError ('No such checkout.session') in sandbox immediately after session creation. Fix applied in /app/backend/server.py: (1) checkout_status() now wraps the SDK call in try/except and falls back to cached tx status from MongoDB (returns HTTP 200 + pending). (2) Added DB short-circuit: if tx.granted==True, return cached paid+client+token without calling Stripe. (3) Added POST /api/webhook/stripe to receive paid events in production. Verified by 7 new tests, all passing."
+}

@@ -229,7 +229,7 @@ class TestPayments:
         # Verify a payment_transactions row was created via status endpoint
         sid = data["session_id"]
         r2 = s.get(f"{API}/payments/checkout/status/{sid}")
-        assert r2.status_code == 200
+        assert r2.status_code == 200, r2.text
         st = r2.json()
         assert st["payment_status"] in ("pending", "unpaid", "paid")
         # Cleanup
@@ -238,13 +238,140 @@ class TestPayments:
             if c["email"] == email:
                 s.delete(f"{API}/admin/clients/{c['id']}", headers=admin_headers)
 
-    def test_status_unknown_session_404(self, s):
-        r = s.get(f"{API}/payments/checkout/status/nonexistent_session_xyz")
-        assert r.status_code in (404, 400, 500)
-        # The endpoint raises 404 for unknown session
-        if r.status_code != 404:
-            # acceptable but flag
+    def test_checkout_status_returns_pending_not_500(self, s, admin_headers):
+        """REGRESSION FIX: get_checkout_status fails in emergent sandbox → must return HTTP 200 pending, NOT 500."""
+        email = f"test_pending_{int(time.time())}@example.com"
+        r = s.post(f"{API}/payments/checkout",
+                   json={"name": "Pending User", "email": email, "origin_url": BASE_URL})
+        assert r.status_code == 200, r.text
+        sid = r.json()["session_id"]
+        # Immediately poll status (before Stripe session matures in sandbox)
+        r2 = s.get(f"{API}/payments/checkout/status/{sid}")
+        assert r2.status_code == 200, f"Expected 200 pending, got {r2.status_code}: {r2.text}"
+        st = r2.json()
+        assert st["payment_status"] == "pending", f"Expected pending, got: {st}"
+        assert st["status"] in ("pending", "initiated", "open")
+        # Cleanup
+        clients = s.get(f"{API}/admin/clients", headers=admin_headers).json()
+        for c in clients:
+            if c["email"] == email:
+                s.delete(f"{API}/admin/clients/{c['id']}", headers=admin_headers)
+
+    def test_checkout_status_idempotent_pending(self, s, admin_headers):
+        """Calling status repeatedly with non-paid session keeps returning pending without error."""
+        email = f"test_idem_{int(time.time())}@example.com"
+        r = s.post(f"{API}/payments/checkout",
+                   json={"name": "Idem User", "email": email, "origin_url": BASE_URL})
+        assert r.status_code == 200
+        sid = r.json()["session_id"]
+        for i in range(3):
+            r2 = s.get(f"{API}/payments/checkout/status/{sid}")
+            assert r2.status_code == 200, f"Call #{i}: {r2.status_code} - {r2.text}"
+            assert r2.json()["payment_status"] == "pending"
+        # Cleanup
+        clients = s.get(f"{API}/admin/clients", headers=admin_headers).json()
+        for c in clients:
+            if c["email"] == email:
+                s.delete(f"{API}/admin/clients/{c['id']}", headers=admin_headers)
+
+    def test_status_unknown_session_returns_404(self, s):
+        """Unknown session_id returns 404, never 500."""
+        r = s.get(f"{API}/payments/checkout/status/nonexistent_session_xyz_12345")
+        assert r.status_code == 404, f"Expected 404, got {r.status_code}: {r.text}"
+
+    def test_checkout_creates_tx_with_webhook_url(self, s, admin_headers):
+        """payment_transactions row must store webhook_url (used for status fallback)."""
+        import pymongo
+        mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+        db_name = os.environ.get('DB_NAME', 'test_database')
+        # Default DB_NAME might not match; try reading from backend .env
+        try:
+            with open('/app/backend/.env') as f:
+                for line in f:
+                    if line.startswith('DB_NAME='):
+                        db_name = line.strip().split('=', 1)[1].strip('"').strip("'")
+                    if line.startswith('MONGO_URL='):
+                        mongo_url = line.strip().split('=', 1)[1].strip('"').strip("'")
+        except Exception:
             pass
+        email = f"test_webhook_{int(time.time())}@example.com"
+        r = s.post(f"{API}/payments/checkout",
+                   json={"name": "Webhook User", "email": email, "origin_url": BASE_URL})
+        assert r.status_code == 200
+        sid = r.json()["session_id"]
+        # Direct DB check
+        mc = pymongo.MongoClient(mongo_url)
+        tx = mc[db_name].payment_transactions.find_one({"session_id": sid})
+        assert tx is not None, "payment_transactions row missing"
+        assert tx.get("webhook_url"), "webhook_url not stored on tx"
+        assert "/api/webhook/stripe" in tx["webhook_url"]
+        assert tx.get("payment_status") == "pending"
+        mc.close()
+        # Cleanup
+        clients = s.get(f"{API}/admin/clients", headers=admin_headers).json()
+        for c in clients:
+            if c["email"] == email:
+                s.delete(f"{API}/admin/clients/{c['id']}", headers=admin_headers)
+
+    def test_status_short_circuits_when_granted(self, s, admin_headers):
+        """When tx.granted=True in DB, status endpoint returns paid+client+token without calling Stripe."""
+        import pymongo, uuid as _uuid
+        mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+        db_name = 'test_database'
+        try:
+            with open('/app/backend/.env') as f:
+                for line in f:
+                    if line.startswith('DB_NAME='):
+                        db_name = line.strip().split('=', 1)[1].strip('"').strip("'")
+                    if line.startswith('MONGO_URL='):
+                        mongo_url = line.strip().split('=', 1)[1].strip('"').strip("'")
+        except Exception:
+            pass
+        email = f"test_granted_{int(time.time())}@example.com"
+        r = s.post(f"{API}/payments/checkout",
+                   json={"name": "Granted User", "email": email, "origin_url": BASE_URL})
+        assert r.status_code == 200
+        sid = r.json()["session_id"]
+        # Manually flip granted=True (simulating webhook delivery)
+        mc = pymongo.MongoClient(mongo_url)
+        res = mc[db_name].payment_transactions.update_one(
+            {"session_id": sid},
+            {"$set": {"granted": True, "payment_status": "paid", "status": "complete"}},
+        )
+        assert res.modified_count == 1
+        mc.close()
+        # Status endpoint should now short-circuit
+        r2 = s.get(f"{API}/payments/checkout/status/{sid}")
+        assert r2.status_code == 200, r2.text
+        st = r2.json()
+        assert st["payment_status"] == "paid"
+        assert st["status"] == "complete"
+        # client + token must be returned (note: short-circuit branch doesn't grant subscription, only returns client)
+        assert "client" in st and st["client"] is not None
+        assert st["client"]["email"] == email
+        # token may be empty string since _grant_subscription wasn't called in short-circuit; just verify key exists
+        assert "token" in st
+        # Cleanup
+        clients = s.get(f"{API}/admin/clients", headers=admin_headers).json()
+        for c in clients:
+            if c["email"] == email:
+                s.delete(f"{API}/admin/clients/{c['id']}", headers=admin_headers)
+
+
+# ---------- Stripe Webhook ----------
+class TestStripeWebhook:
+    def test_webhook_endpoint_exists_rejects_invalid(self, s):
+        """POST /api/webhook/stripe exists and returns 400 on missing/invalid signature."""
+        r = s.post(f"{API}/webhook/stripe", data="", headers={"Content-Type": "application/json"})
+        # Must NOT be 404 (endpoint exists). 400 expected for invalid sig.
+        assert r.status_code != 404, "webhook endpoint missing"
+        assert r.status_code == 400, f"Expected 400 invalid sig, got {r.status_code}: {r.text}"
+
+    def test_webhook_invalid_body_rejected(self, s):
+        r = s.post(f"{API}/webhook/stripe",
+                   data='{"type":"checkout.session.completed"}',
+                   headers={"Content-Type": "application/json", "Stripe-Signature": "t=1,v1=fake"})
+        assert r.status_code == 400
 
 
 # ---------- Admin Delete ----------

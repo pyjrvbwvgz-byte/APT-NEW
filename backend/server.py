@@ -238,7 +238,6 @@ async def create_checkout(payload: CheckoutIn, request: Request):
     """Creates a Stripe Checkout session for €14.99 one-month access."""
     email = payload.email.lower().strip()
     name = payload.name.strip()
-    # Upsert client (subscribed flag set on completion)
     existing = await db.clients.find_one({"email": email}, {"_id": 0})
     if existing:
         client_id = existing["id"]
@@ -259,7 +258,8 @@ async def create_checkout(payload: CheckoutIn, request: Request):
     cancel_url = f"{payload.origin_url.rstrip('/')}/subscribe?cancelled=1"
     metadata = {"client_id": client_id, "email": email, "purpose": "monthly_access"}
 
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY)
+    webhook_url = f"{payload.origin_url.rstrip('/')}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
     req = CheckoutSessionRequest(
         amount=float(SUBSCRIPTION_PRICE),
         currency=SUBSCRIPTION_CURRENCY,
@@ -279,10 +279,44 @@ async def create_checkout(payload: CheckoutIn, request: Request):
         "status": "initiated",
         "payment_status": "pending",
         "metadata": metadata,
+        "webhook_url": webhook_url,
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     })
     return {"url": session.url, "session_id": session.session_id}
+
+async def _grant_subscription(client_id: str, session_id: str) -> Optional[dict]:
+    """Idempotently grants subscription access for a paid session. Returns updated client doc."""
+    # mark tx granted (single-writer)
+    res = await db.payment_transactions.update_one(
+        {"session_id": session_id, "granted": {"$ne": True}},
+        {"$set": {"granted": True, "payment_status": "paid", "status": "complete",
+                  "updated_at": now_utc().isoformat()}},
+    )
+    if res.modified_count == 0:
+        # already granted; just return current client
+        return await db.clients.find_one({"id": client_id}, {"_id": 0})
+    c = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not c:
+        return None
+    current_exp = None
+    if c.get("subscription_expires_at"):
+        try:
+            current_exp = datetime.fromisoformat(c["subscription_expires_at"])
+        except Exception:
+            current_exp = None
+    base = current_exp if (current_exp and current_exp > now_utc()) else now_utc()
+    new_exp = base + timedelta(days=SUBSCRIPTION_DAYS)
+    sub_token = uuid.uuid4().hex[:24]
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {
+            "subscription_expires_at": new_exp.isoformat(),
+            "subscription_token": sub_token,
+            "last_payment_session_id": session_id,
+        }},
+    )
+    return await db.clients.find_one({"id": client_id}, {"_id": 0})
 
 @api_router.get("/payments/checkout/status/{session_id}")
 async def checkout_status(session_id: str):
@@ -290,59 +324,70 @@ async def checkout_status(session_id: str):
     if not tx:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY)
-    status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+    # If already granted via webhook, return the cached state immediately
+    if tx.get("granted"):
+        c = await db.clients.find_one({"id": tx["client_id"]}, {"_id": 0})
+        return {
+            "status": "complete",
+            "payment_status": "paid",
+            "amount_total": int(tx.get("amount", 0) * 100),
+            "currency": tx.get("currency", SUBSCRIPTION_CURRENCY),
+            "client": client_public(c) if c else None,
+            "token": f"{c['id']}:{c.get('subscription_token','')}" if c else None,
+        }
 
-    # Update transaction
-    new_status = status.status
-    new_payment_status = status.payment_status
+    # Otherwise try Stripe (might fail in emergent sandbox until session matures or webhook arrives)
+    webhook_url = tx.get("webhook_url") or ""
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    try:
+        status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+        new_status = status.status
+        new_payment_status = status.payment_status
+        amount_total = status.amount_total
+        currency = status.currency
+    except Exception as e:
+        logger.warning("get_checkout_status failed for %s: %s", session_id, e)
+        return {
+            "status": tx.get("status", "pending"),
+            "payment_status": tx.get("payment_status", "pending"),
+            "amount_total": int(tx.get("amount", 0) * 100),
+            "currency": tx.get("currency", SUBSCRIPTION_CURRENCY),
+        }
+
     await db.payment_transactions.update_one(
         {"session_id": session_id},
-        {"$set": {
-            "status": new_status,
-            "payment_status": new_payment_status,
-            "updated_at": now_utc().isoformat(),
-        }},
+        {"$set": {"status": new_status, "payment_status": new_payment_status,
+                  "updated_at": now_utc().isoformat()}},
     )
 
-    # On first successful payment, grant subscription access (idempotent)
-    response: Dict = {
-        "status": new_status,
-        "payment_status": new_payment_status,
-        "amount_total": status.amount_total,
-        "currency": status.currency,
-    }
-    if new_payment_status == "paid" and not tx.get("granted"):
-        # mark granted to prevent double-application
-        await db.payment_transactions.update_one(
-            {"session_id": session_id, "granted": {"$ne": True}},
-            {"$set": {"granted": True}},
-        )
-        client_id = tx.get("client_id")
-        c = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    response: Dict = {"status": new_status, "payment_status": new_payment_status,
+                      "amount_total": amount_total, "currency": currency}
+
+    if new_payment_status == "paid":
+        c = await _grant_subscription(tx.get("client_id"), session_id)
         if c:
-            # extend or set subscription
-            current_exp = None
-            if c.get("subscription_expires_at"):
-                try:
-                    current_exp = datetime.fromisoformat(c["subscription_expires_at"])
-                except Exception:
-                    current_exp = None
-            base = current_exp if (current_exp and current_exp > now_utc()) else now_utc()
-            new_exp = base + timedelta(days=SUBSCRIPTION_DAYS)
-            sub_token = uuid.uuid4().hex[:24]
-            await db.clients.update_one(
-                {"id": client_id},
-                {"$set": {
-                    "subscription_expires_at": new_exp.isoformat(),
-                    "subscription_token": sub_token,
-                    "last_payment_session_id": session_id,
-                }},
-            )
-            updated = await db.clients.find_one({"id": client_id}, {"_id": 0})
-            response["client"] = client_public(updated)
-            response["token"] = f"{client_id}:{sub_token}"
+            response["client"] = client_public(c)
+            response["token"] = f"{c['id']}:{c.get('subscription_token','')}"
     return response
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature", "")
+    # Use any active StripeCheckout instance; webhook_url is informational here
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url="")
+    try:
+        evt = await stripe_checkout.handle_webhook(body, signature)
+    except Exception as e:
+        logger.warning("stripe webhook parse failed: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid webhook")
+    session_id = getattr(evt, "session_id", None)
+    payment_status = getattr(evt, "payment_status", None)
+    if session_id and payment_status == "paid":
+        tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+        if tx:
+            await _grant_subscription(tx.get("client_id"), session_id)
+    return {"ok": True}
 
 # ---------- recipes & menu ----------
 @api_router.get("/recipes")
