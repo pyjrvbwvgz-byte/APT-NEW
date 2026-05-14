@@ -1,53 +1,26 @@
-import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "../lib/api";
 import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Check, CreditCard, ShieldCheck, ArrowLeft, Lock } from "lucide-react";
+import { Check, CreditCard, ShieldCheck, ArrowLeft, Lock, ArrowRight, KeyRound } from "lucide-react";
 
 export default function SubscribePage() {
-  const navigate = useNavigate();
   const [params] = useSearchParams();
   const cancelled = params.get("cancelled");
+  const [paymentLink, setPaymentLink] = useState("");
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const onSubscribe = async (e) => {
-    e.preventDefault();
-    if (!name.trim() || !email.trim()) {
-      toast.error("Please enter your name and email");
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await axios.post(`${API}/payments/checkout`, {
-        name: name.trim(),
-        email: email.trim(),
-        origin_url: window.location.origin,
-      });
-      if (r.data?.url) {
-        window.location.href = r.data.url;
-      } else {
-        toast.error("Could not start checkout");
-      }
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Checkout failed");
-      setBusy(false);
-    }
-  };
+  useEffect(() => {
+    axios.get(`${API}/pricing`).then((r) => setPaymentLink(r.data?.payment_link || ""));
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
       <Header />
       <main className="flex-1 py-12 lg:py-20">
         <div className="max-w-5xl mx-auto px-4 grid lg:grid-cols-2 gap-10 items-start">
-          {/* Form */}
+          {/* Left */}
           <div>
             <Link
               to="/"
@@ -63,7 +36,7 @@ export default function SubscribePage() {
               €14.99 / month.
             </h1>
             <p className="mt-3 text-[#5C7063]">
-              Full access to weekly meal plans, recipes with macros, the auto shopping list and PDF download.
+              Full access to weekly meal plans, recipes with macros, the auto shopping list and PDF download. Cancel anytime.
             </p>
 
             {cancelled && (
@@ -75,48 +48,43 @@ export default function SubscribePage() {
               </div>
             )}
 
-            <form onSubmit={onSubscribe} className="mt-8 bg-white border border-[#E5EFE8] rounded-2xl p-6 space-y-5 shadow-sm">
-              <div>
-                <Label htmlFor="sub-name">Full name</Label>
-                <Input
-                  id="sub-name"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1.5"
-                  data-testid="subscribe-name-input"
-                />
-              </div>
-              <div>
-                <Label htmlFor="sub-email">Email</Label>
-                <Input
-                  id="sub-email"
-                  type="email"
-                  placeholder="you@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5"
-                  data-testid="subscribe-email-input"
-                />
-                <p className="mt-1.5 text-xs text-[#5C7063]">
-                  We'll use this to log you in after payment.
-                </p>
-              </div>
-              <Button
-                type="submit"
-                disabled={busy}
-                className="w-full bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 font-semibold"
-                data-testid="subscribe-submit-btn"
+            <div className="mt-8 bg-white border border-[#E5EFE8] rounded-2xl p-6 shadow-sm">
+              <a
+                href={paymentLink || "#"}
+                target={paymentLink ? "_self" : "_blank"}
+                rel="noopener noreferrer"
+                data-testid="subscribe-pay-link"
+                aria-disabled={!paymentLink}
+                onClick={(e) => {
+                  if (!paymentLink) e.preventDefault();
+                }}
               >
-                {busy ? "Redirecting to Stripe…" : "Continue to checkout"}
-              </Button>
-              <div className="flex items-center justify-center gap-2 text-xs text-[#5C7063] pt-1">
+                <Button
+                  type="button"
+                  disabled={!paymentLink}
+                  className="w-full bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 font-semibold"
+                  data-testid="subscribe-submit-btn"
+                >
+                  Continue to secure checkout <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </a>
+              <div className="flex items-center justify-center gap-2 text-xs text-[#5C7063] pt-4">
                 <Lock className="w-3 h-3" /> Secure payment by Stripe
               </div>
-            </form>
+              <p className="text-xs text-[#5C7063] mt-3 text-center leading-relaxed">
+                You'll enter your card details on Stripe. After payment we'll bring you back to log in.
+              </p>
+            </div>
+
+            <div className="mt-6 text-sm text-[#5C7063] text-center">
+              Already paid?{" "}
+              <Link to="/subscribe/success" className="text-[#10B981] hover:underline font-medium">
+                Activate access
+              </Link>
+            </div>
           </div>
 
-          {/* Benefits side */}
+          {/* Right */}
           <div className="bg-white border border-[#E5EFE8] rounded-2xl p-8 lg:sticky lg:top-24">
             <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">
               What's included
@@ -131,7 +99,7 @@ export default function SubscribePage() {
                 "Auto-aggregated shopping list",
                 "Downloadable combined PDF",
                 "New menus every Monday",
-                "Cancel anytime",
+                "Cancel anytime — self-service in Stripe",
               ].map((t) => (
                 <li key={t} className="flex gap-3 text-[#111C15]">
                   <Check className="w-5 h-5 text-[#10B981] flex-none mt-0.5" /> {t}
@@ -139,7 +107,7 @@ export default function SubscribePage() {
               ))}
             </ul>
             <div className="mt-8 border-t border-[#E5EFE8] pt-6 flex items-start gap-3 text-sm text-[#5C7063]">
-              <ShieldCheck className="w-5 h-5 text-[#10B981] flex-none" />
+              <KeyRound className="w-5 h-5 text-[#10B981] flex-none" />
               <div>
                 Already a coaching client? Use your weekly{" "}
                 <Link to="/auth" className="underline text-[#1A3622] hover:text-[#10B981]">
@@ -147,6 +115,10 @@ export default function SubscribePage() {
                 </Link>
                 .
               </div>
+            </div>
+            <div className="mt-3 flex items-start gap-3 text-sm text-[#5C7063]">
+              <ShieldCheck className="w-5 h-5 text-[#10B981] flex-none" />
+              <div>Powered by Stripe. We never see or store your card details.</div>
             </div>
           </div>
         </div>

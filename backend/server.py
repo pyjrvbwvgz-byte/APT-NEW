@@ -23,6 +23,12 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutSessionRequest,
     CheckoutStatusResponse,
 )
+from stripe_service import (
+    verify_webhook,
+    create_portal_session,
+    retrieve_session_customer,
+    STRIPE_PAYMENT_LINK,
+)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -215,7 +221,50 @@ async def pricing():
         "currency": SUBSCRIPTION_CURRENCY,
         "period_days": SUBSCRIPTION_DAYS,
         "label": "€14.99 / month",
+        "payment_link": STRIPE_PAYMENT_LINK,
     }
+
+class LookupIn(BaseModel):
+    email: EmailStr
+
+@api_router.post("/payments/lookup")
+async def lookup_subscription(payload: LookupIn):
+    """Looks up a client by email and returns auth credentials if they have an active subscription.
+    Used by the /subscribe/success page after a user pays via the Stripe Payment Link."""
+    email = payload.email.lower().strip()
+    c = await db.clients.find_one({"email": email}, {"_id": 0})
+    if not c or not c.get("active", True):
+        return {"found": False, "active": False, "message": "No account yet. Webhook may not have processed — please wait a few seconds and try again."}
+    if not has_active_subscription(c):
+        return {"found": True, "active": False, "message": "We don't see an active subscription for this email yet. If you just paid, refresh in a few seconds."}
+    # ensure subscription_token exists
+    if not c.get("subscription_token"):
+        new_token = uuid.uuid4().hex[:24]
+        await db.clients.update_one({"id": c["id"]}, {"$set": {"subscription_token": new_token}})
+        c["subscription_token"] = new_token
+    return {
+        "found": True,
+        "active": True,
+        "client": client_public(c),
+        "token": f"{c['id']}:{c['subscription_token']}",
+    }
+
+@api_router.post("/payments/portal")
+async def portal(request: Request, client_in: dict = Depends(get_current_client)):
+    """Creates a Stripe Customer Portal session for the authenticated subscriber."""
+    customer_id = client_in.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer on file. Subscribe first.")
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    return_url = body.get("return_url") or "/dashboard"
+    url = await create_portal_session(customer_id, return_url)
+    if not url:
+        raise HTTPException(status_code=500, detail="Could not create portal session")
+    return {"url": url}
 
 @api_router.post("/auth/login")
 async def login(payload: LoginIn):
@@ -374,20 +423,110 @@ async def checkout_status(session_id: str):
 async def stripe_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("Stripe-Signature", "")
-    # Use any active StripeCheckout instance; webhook_url is informational here
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url="")
+    event = verify_webhook(body, signature)
+    if not event:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    event_type = event["type"] if "type" in event else ""
+    data_obj = event["data"]["object"] if event.get("data") else {}
+    # Convert StripeObject to plain dict for downstream code
     try:
-        evt = await stripe_checkout.handle_webhook(body, signature)
-    except Exception as e:
-        logger.warning("stripe webhook parse failed: %s", e)
-        raise HTTPException(status_code=400, detail="Invalid webhook")
-    session_id = getattr(evt, "session_id", None)
-    payment_status = getattr(evt, "payment_status", None)
-    if session_id and payment_status == "paid":
-        tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
-        if tx:
-            await _grant_subscription(tx.get("client_id"), session_id)
+        data_obj = dict(data_obj)
+    except Exception:
+        pass
+    logger.info("stripe webhook: %s id=%s", event_type, data_obj.get("id") if isinstance(data_obj, dict) else "?")
+
+    # Payment completed via Payment Link or Checkout
+    if event_type == "checkout.session.completed":
+        await _handle_checkout_completed(data_obj)
+    elif event_type == "invoice.paid":
+        # Recurring subscription renewal
+        customer_id = data_obj.get("customer")
+        if customer_id:
+            await _extend_subscription_by_customer(customer_id)
+    elif event_type in ("customer.subscription.deleted", "customer.subscription.paused"):
+        customer_id = data_obj.get("customer")
+        if customer_id:
+            await _revoke_subscription_by_customer(customer_id)
     return {"ok": True}
+
+async def _handle_checkout_completed(session: dict):
+    """Handles a paid Stripe Checkout / Payment Link session."""
+    email = (session.get("customer_email")
+             or (session.get("customer_details") or {}).get("email") or "").lower().strip()
+    customer_id = session.get("customer")
+    subscription_id = session.get("subscription")
+    name = ((session.get("customer_details") or {}).get("name") or email.split("@")[0] or "Subscriber").strip()
+    if not email:
+        logger.warning("checkout.session.completed without email: %s", session.get("id"))
+        return
+    # Upsert client
+    c = await db.clients.find_one({"email": email}, {"_id": 0})
+    if not c:
+        client_id = str(uuid.uuid4())
+        await db.clients.insert_one({
+            "id": client_id,
+            "name": name,
+            "email": email,
+            "created_at": now_utc().isoformat(),
+            "active": True,
+            "code": None,
+            "code_expires_at": None,
+        })
+    else:
+        client_id = c["id"]
+    # Grant subscription (30 days; renewals will extend via invoice.paid)
+    sub_token = uuid.uuid4().hex[:24]
+    new_exp = (now_utc() + timedelta(days=SUBSCRIPTION_DAYS)).isoformat()
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {
+            "subscription_expires_at": new_exp,
+            "subscription_token": sub_token,
+            "stripe_customer_id": customer_id,
+            "stripe_subscription_id": subscription_id,
+            "active": True,
+        }},
+    )
+    # Persist transaction
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.get("id"),
+        "client_id": client_id,
+        "email": email,
+        "amount": (session.get("amount_total") or 0) / 100,
+        "currency": session.get("currency", SUBSCRIPTION_CURRENCY),
+        "status": "complete",
+        "payment_status": "paid",
+        "granted": True,
+        "stripe_customer_id": customer_id,
+        "stripe_subscription_id": subscription_id,
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    })
+    logger.info("granted subscription for %s (client_id=%s)", email, client_id)
+
+async def _extend_subscription_by_customer(customer_id: str):
+    c = await db.clients.find_one({"stripe_customer_id": customer_id}, {"_id": 0})
+    if not c:
+        return
+    base = now_utc()
+    if c.get("subscription_expires_at"):
+        try:
+            cur = datetime.fromisoformat(c["subscription_expires_at"])
+            if cur > base:
+                base = cur
+        except Exception:
+            pass
+    new_exp = (base + timedelta(days=SUBSCRIPTION_DAYS)).isoformat()
+    await db.clients.update_one({"id": c["id"]}, {"$set": {"subscription_expires_at": new_exp}})
+
+async def _revoke_subscription_by_customer(customer_id: str):
+    res = await db.clients.update_one(
+        {"stripe_customer_id": customer_id},
+        {"$set": {"subscription_expires_at": (now_utc() - timedelta(seconds=1)).isoformat()}},
+    )
+    logger.info("revoked subscription for customer %s (matched=%d)", customer_id, res.matched_count)
 
 # ---------- recipes & menu ----------
 @api_router.get("/recipes")

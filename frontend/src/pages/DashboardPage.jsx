@@ -7,7 +7,7 @@ import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { generateMealPlanPDF } from "../lib/pdf";
-import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet } from "lucide-react";
+import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet, CreditCard } from "lucide-react";
 
 const DAY_LABELS = {
   Mon: "Monday",
@@ -157,6 +157,25 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              {client?.is_subscribed && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const r = await api.post("/payments/portal", {
+                        return_url: window.location.origin + "/dashboard",
+                      });
+                      if (r.data?.url) window.location.href = r.data.url;
+                    } catch (err) {
+                      toast.error(err?.response?.data?.detail || "Could not open portal");
+                    }
+                  }}
+                  className="border-[#E5EFE8] hover:bg-[#F3F7F4]"
+                  data-testid="manage-subscription-btn"
+                >
+                  <CreditCard className="w-4 h-4 mr-2" /> Manage subscription
+                </Button>
+              )}
               <Button
                 onClick={onDownloadPDF}
                 disabled={downloading || loading}
