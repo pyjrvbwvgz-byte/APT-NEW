@@ -1,47 +1,50 @@
-# ABPT — bruddatrain · Product Requirements Document
-
-## Original problem statement
-Create a professional meal prep website with weekly menus, the option of client profiles aswell, I want a custom domain, make the meal plans viable to download via pdf, incorporate foods such as breakfast bagel, chicken stir fry with rice, burrito bowl, 100% Irish beef burger with sweet potato fries, Greek yogurt with granola and fruit (strawberries, blueberries, bananas, kiwis), a chicken salad, omelette, avocado toast with fried egg, spaghetti Alfredo, potatoes salmon and broccoli with rice and asparagus, steak, banana pancakes, oats — plus a shopping list for all items mentioned in the recipes.
+# APT — bruddatrain · Product Requirements Document
 
 ## Brand
-- Name: **ABPT**
+- Name: **APT** (Abraham's Personal Training)
 - Tagline: **bruddatrain**
-- Target domain: **apt_train.ie**
+- Domain: **apttrains.com** (production)
 - Vibe: simplistic, green, encouraging.
 
-## User choices captured
-- 4-digit code auth (client self-register, code regenerates every 7 days, admin can remove clients).
-- Single rotating weekly menu (Mon–Sun · breakfast/lunch/dinner).
-- Auto-generated shopping list from the active week.
-- Combined PDF: meal plan + recipes + shopping list.
-- No prices/currency.
+## Access model (two paths)
+1. **Stripe Subscription** — €14.99/month, 30-day access pass. Cancel anytime, immediate loss of access on expiry.
+2. **Admin-issued 4-digit code** — created by Abraham for active coaching clients; auto-rotates every Monday; codes emailed to admin (`abpt@apttrains.com`) for distribution. Stops working when admin stops sharing/regenerating.
 
 ## Architecture
-- **Backend**: FastAPI + MongoDB (motor). Routes under `/api`. Recipes seeded on startup.
-- **Frontend**: React (CRA + craco), TailwindCSS, shadcn/ui, lucide-react icons, sonner toasts. PDF via `jspdf` + `jspdf-autotable`.
-- **Auth**: client token = `<client_id>:<code>` (Bearer). Admin token = `admin:<password>`.
+- **Backend**: FastAPI + MongoDB (motor). Routes under `/api`. Stripe via `emergentintegrations.payments.stripe.checkout`. Email via Resend.
+- **Frontend**: React (CRA+craco) + Tailwind + shadcn/ui + lucide-react + jsPDF.
+- **Auth**: token = `<client_id>:<secret>` (Bearer). Secret = subscription_token if subscribed, else weekly code. Admin token = `admin:<password>`.
+- **Webhook**: POST /api/webhook/stripe for production payment confirmation.
+- **Background**: weekly_rotation_loop runs hourly to auto-rotate Monday and email admin digest.
 
 ## Personas
-1. **Client (member)** — receives a 4-digit code, views weekly plan, downloads PDF.
-2. **Admin (coach)** — logs in, manages clients (remove / regenerate code), edits the weekly menu.
+1. **Subscriber** — pays €14.99/mo, instant access via Stripe Checkout.
+2. **Coaching client** — receives weekly 4-digit code from Abraham, loses access if not coaching anymore.
+3. **Admin (Abraham)** — creates clients, rotates codes, edits weekly menu, removes clients.
 
 ## Implemented (2026-02)
-- Landing page (hero, How it works, CTA) — green/earthy aesthetic, Outfit/Manrope fonts.
-- Registration / login (OTP-style 4-digit input).
-- Client dashboard: Mon–Sun grid (21 meals), recipe cards with images, countdown badge, refresh-code button.
-- Recipe detail page with ingredients & step-by-step instructions.
-- Shopping list (aggregated, de-duped by name+unit) with checkable items.
-- Combined PDF (cover · weekly table · per-recipe pages · shopping list).
-- Admin panel: password login (`abpt2025` default), client table (regen code, remove), weekly menu editor with shadcn Select per slot, Save.
-- 15 seeded recipes covering every food user listed + mix-ins (tuna wrap, smoothie bowl, overnight oats).
+- Landing page with dual CTAs + pricing cards
+- Stripe €14.99/mo subscription flow (checkout → success polling → idempotent grant)
+- Stripe webhook receiver for production confirmation
+- Admin-issued 4-digit code system with weekly Monday auto-rotation
+- Admin client CRUD: create (emails code to admin), remove, regenerate, rotate-all
+- Per-recipe macros (kcal/protein/carbs/fat) + dashboard weekly totals + daily kcal
+- Combined PDF (cover + weekly grid + per-recipe + shopping list, with macros)
+- Auto-aggregated shopping list (dedup by name+unit)
+- 15 seeded recipes covering all foods user listed + mix-ins
+- Branded HTML email templates (code + admin digest)
+- APT logo (light version) in header/footer/favicon/PDF
+- Emergent attribution badge hidden
 
 ## Backlog
-- **P1**: connect real custom domain `apt_train.ie` after deployment via Emergent dashboard.
-- **P1**: email the 4-digit code to clients on register (Resend/SendGrid integration).
-- **P2**: weekly auto-rotation cron — at week_start, shuffle templates so the plan feels fresh.
-- **P2**: macros (kcal/protein/carbs/fat) per recipe + weekly totals.
-- **P2**: client favourite / dislike list to personalise the weekly plan.
-- **P3**: Stripe subscription gating (optional).
+- **P1**: Verify a sender domain in Resend (e.g. `coach@apttrains.com`) so emails reach all clients/admin
+- **P1**: Production env vars on deployment: ensure STRIPE_API_KEY, RESEND_API_KEY, SENDER_EMAIL, ADMIN_PASSWORD, ADMIN_NOTIFY_EMAIL are set in Emergent dashboard
+- **P1**: Switch to a real (non-test) Stripe key once live billing required
+- **P2**: True recurring Stripe subscription (current model is monthly access passes; user pays each month)
+- **P2**: Subscriber self-service portal (cancel, change card, view invoices)
+- **P2**: Email subscribers their renewal date 3 days before expiry
+- **P3**: Macros customisation per client (calorie target, dietary tags)
+- **P3**: "Resend my code" button for clients on the login screen
 
 ## Test credentials
 See `/app/memory/test_credentials.md`.
