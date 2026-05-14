@@ -37,9 +37,10 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'abpt2025')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'abpt2025'
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_NOTIFY_EMAIL', 'abpt@apttrains.com')
+ADMIN_SESSION_HOURS = 8
 
 # Single product: monthly access (€14.99). Defined server-side ONLY.
 SUBSCRIPTION_PRICE = 14.99
@@ -187,8 +188,19 @@ async def require_admin(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Admin auth required")
     token = authorization.split(" ", 1)[1]
-    if token != f"admin:{ADMIN_PASSWORD}":
+    if not token.startswith("admin:"):
         raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    session_id = token.split(":", 1)[1]
+    sess = await db.admin_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=401, detail="Admin session not found")
+    try:
+        exp = datetime.fromisoformat(sess["expires_at"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid admin session")
+    if exp < now_utc():
+        await db.admin_sessions.delete_one({"id": session_id})
+        raise HTTPException(status_code=401, detail="Admin session expired")
     return True
 
 def client_public(c: dict) -> dict:
@@ -584,9 +596,27 @@ async def shopping_list(client_in: dict = Depends(get_current_client)):
 # ---------- admin ----------
 @api_router.post("/admin/login")
 async def admin_login(payload: AdminLoginIn):
-    if payload.password != ADMIN_PASSWORD:
+    if not ADMIN_PASSWORD or payload.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Wrong admin password")
-    return {"token": f"admin:{ADMIN_PASSWORD}"}
+    session_id = uuid.uuid4().hex
+    expires_at = (now_utc() + timedelta(hours=ADMIN_SESSION_HOURS)).isoformat()
+    await db.admin_sessions.insert_one({
+        "id": session_id,
+        "created_at": now_utc().isoformat(),
+        "expires_at": expires_at,
+    })
+    return {"token": f"admin:{session_id}", "expires_at": expires_at}
+
+@api_router.post("/admin/logout")
+async def admin_logout(_: bool = Depends(require_admin), authorization: Optional[str] = Header(None)):
+    if authorization and authorization.startswith("Bearer admin:"):
+        session_id = authorization.split("admin:", 1)[1]
+        await db.admin_sessions.delete_one({"id": session_id})
+    return {"ok": True}
+
+@api_router.get("/admin/ping")
+async def admin_ping(_: bool = Depends(require_admin)):
+    return {"ok": True}
 
 @api_router.get("/admin/clients")
 async def admin_clients(_: bool = Depends(require_admin)):

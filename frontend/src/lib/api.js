@@ -13,7 +13,16 @@ api.interceptors.request.use((config) => {
 
 export const adminApi = axios.create({ baseURL: API });
 adminApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("abpt_admin_token");
+  const token = sessionStorage.getItem("abpt_admin_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+adminApi.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    if (err?.response?.status === 401) {
+      sessionStorage.removeItem("abpt_admin_token");
+    }
+    return Promise.reject(err);
+  }
+);

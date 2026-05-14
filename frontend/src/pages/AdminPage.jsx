@@ -27,11 +27,36 @@ import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCar
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(
-    !!localStorage.getItem("abpt_admin_token")
-  );
+  const [authed, setAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Validate any existing token on mount; if invalid, force re-login
+  useEffect(() => {
+    const token = sessionStorage.getItem("abpt_admin_token");
+    if (!token) {
+      setChecking(false);
+      return;
+    }
+    adminApi
+      .get("/admin/ping")
+      .then(() => setAuthed(true))
+      .catch(() => {
+        sessionStorage.removeItem("abpt_admin_token");
+        setAuthed(false);
+      })
+      .finally(() => setChecking(false));
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
+        <Header />
+        <div className="flex-1 flex items-center justify-center text-[#5C7063]">Checking session…</div>
+      </div>
+    );
+  }
 
   if (!authed) {
     const onLogin = async (e) => {
@@ -39,7 +64,7 @@ export default function AdminPage() {
       setBusy(true);
       try {
         const r = await axios.post(`${API}/admin/login`, { password });
-        localStorage.setItem("abpt_admin_token", r.data.token);
+        sessionStorage.setItem("abpt_admin_token", r.data.token);
         setAuthed(true);
       } catch (err) {
         toast.error(err?.response?.data?.detail || "Wrong password");
@@ -69,6 +94,7 @@ export default function AdminPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="mt-1.5"
+                    autoFocus
                     data-testid="admin-password-input"
                   />
                 </div>
@@ -80,6 +106,9 @@ export default function AdminPage() {
                 >
                   Enter admin
                 </Button>
+                <p className="text-xs text-[#5C7063] pt-1">
+                  Sessions expire after 8 hours and on browser close.
+                </p>
               </form>
             </div>
           </div>
@@ -89,10 +118,13 @@ export default function AdminPage() {
     );
   }
 
-  return <AdminDashboard onLogout={() => {
-    localStorage.removeItem("abpt_admin_token");
+  const handleLogout = async () => {
+    try { await adminApi.post("/admin/logout"); } catch (e) { /* ignore */ }
+    sessionStorage.removeItem("abpt_admin_token");
     setAuthed(false);
-  }} />;
+  };
+
+  return <AdminDashboard onLogout={handleLogout} />;
 }
 
 function AdminDashboard({ onLogout }) {
