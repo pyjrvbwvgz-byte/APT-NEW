@@ -24,8 +24,9 @@
 
 ## Implemented (2026-02)
 - Landing page with dual CTAs + pricing cards
-- Stripe €14.99/mo subscription flow (checkout → success polling → idempotent grant)
-- Stripe webhook receiver for production confirmation
+- **Stripe Payment Link** flow (€14.99/mo) — user clicks Subscribe → Stripe-hosted checkout → returns to /subscribe/success → activates by email lookup
+- **Real Stripe SDK** webhook receiver (`/api/webhook/stripe`): handles `checkout.session.completed` (grant), `invoice.paid` (extend), `customer.subscription.deleted`/`paused` (immediate revoke)
+- **Stripe Customer Portal** — subscribers click "Manage subscription" on dashboard → opens Stripe-hosted portal for self-service cancel/update card/invoices
 - Admin-issued 4-digit code system with weekly Monday auto-rotation
 - Admin client CRUD: create (emails code to admin), remove, regenerate, rotate-all
 - Per-recipe macros (kcal/protein/carbs/fat) + dashboard weekly totals + daily kcal
@@ -37,14 +38,12 @@
 - Emergent attribution badge hidden
 
 ## Backlog
-- **P1**: Verify a sender domain in Resend (e.g. `coach@apttrains.com`) so emails reach all clients/admin
-- **P1**: Production env vars on deployment: ensure STRIPE_API_KEY, RESEND_API_KEY, SENDER_EMAIL, ADMIN_PASSWORD, ADMIN_NOTIFY_EMAIL are set in Emergent dashboard
-- **P1**: Switch to a real (non-test) Stripe key once live billing required
-- **P2**: True recurring Stripe subscription (current model is monthly access passes; user pays each month)
-- **P2**: Subscriber self-service portal (cancel, change card, view invoices)
+- **P1**: Configure Stripe payment link in Stripe dashboard → redirect to `https://apttrains.com/subscribe/success` after success
+- **P1**: Configure Stripe webhook in Stripe dashboard → `https://apttrains.com/api/webhook/stripe` with events `checkout.session.completed`, `invoice.paid`, `customer.subscription.deleted`
+- **P1**: Enable Stripe Customer Portal (Stripe → Settings → Customer Portal → Activate)
+- **P1**: Verify a sender domain in Resend (e.g. `coach@apttrains.com`) and switch SENDER_EMAIL
 - **P2**: Email subscribers their renewal date 3 days before expiry
 - **P3**: Macros customisation per client (calorie target, dietary tags)
-- **P3**: "Resend my code" button for clients on the login screen
 
 ## Test credentials
 See `/app/memory/test_credentials.md`.
