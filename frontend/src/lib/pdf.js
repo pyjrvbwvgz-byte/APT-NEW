@@ -14,34 +14,39 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const GREEN = [16, 185, 129];
 const DARK = [17, 28, 21];
 const MUTED = [92, 112, 99];
+const RED = [220, 38, 38];
 
 function fmtQty(q) {
   return q % 1 === 0 ? `${q}` : q.toFixed(1);
 }
 
-export function generateMealPlanPDF({ client, menu, shopping }) {
+export function generateMealPlanPDF({ client, menu, shopping, totals, dailyTotals }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 48;
 
   // ===== COVER =====
   doc.setFillColor(...GREEN);
   doc.rect(0, 0, pageW, 8, "F");
 
+  // Brand mark: red dot + "APT" wordmark
+  doc.setFillColor(...RED);
+  doc.circle(margin + 8, 95, 7, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(38);
+  doc.setFontSize(40);
   doc.setTextColor(...DARK);
-  doc.text("ABPT", margin, 100);
+  doc.text("APT", margin + 24, 105);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.setTextColor(...GREEN);
-  doc.text("BRUDDATRAIN · WEEKLY MEAL PREP", margin, 122);
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text("ABRAHAM'S PERSONAL TRAINING  ·  bruddatrain", margin, 124);
 
-  doc.setFontSize(28);
+  doc.setFontSize(30);
   doc.setTextColor(...DARK);
   doc.setFont("helvetica", "bold");
-  doc.text("Your week, planned.", margin, 200);
+  doc.text("Your week, planned.", margin, 210);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(12);
@@ -55,23 +60,50 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
         })
       : "—"
   }`;
-  doc.text(subtitle, margin, 222);
+  doc.text(subtitle, margin, 232);
 
-  // table of contents-ish
+  // Weekly macros on cover
+  if (totals) {
+    const boxes = [
+      { label: "WEEKLY KCAL", value: totals.kcal?.toLocaleString() || "0" },
+      { label: "PROTEIN (g)", value: totals.protein?.toLocaleString() || "0" },
+      { label: "CARBS (g)", value: totals.carbs?.toLocaleString() || "0" },
+      { label: "FAT (g)", value: totals.fat?.toLocaleString() || "0" },
+    ];
+    const boxW = (pageW - margin * 2 - 24) / 4;
+    boxes.forEach((b, i) => {
+      const x = margin + i * (boxW + 8);
+      doc.setDrawColor(229, 239, 232);
+      doc.setFillColor(248, 251, 249);
+      doc.roundedRect(x, 270, boxW, 70, 8, 8, "FD");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...MUTED);
+      doc.text(b.label, x + 12, 290);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(...GREEN);
+      doc.text(b.value, x + 12, 322);
+    });
+  }
+
+  // What's inside
   doc.setTextColor(...DARK);
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text("What's inside", margin, 290);
+  doc.text("What's inside", margin, 386);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(...MUTED);
-  ["1.  Weekly meal plan (Mon–Sun)", "2.  Full recipes & instructions", "3.  Auto-generated shopping list"].forEach(
-    (l, i) => doc.text(l, margin, 314 + i * 18)
-  );
+  [
+    "1.  Weekly meal plan (Mon–Sun) with daily kcal totals",
+    "2.  Full recipes — ingredients, macros & instructions",
+    "3.  Auto-generated shopping list",
+  ].forEach((l, i) => doc.text(l, margin, 410 + i * 18));
 
   doc.setFontSize(9);
   doc.setTextColor(...MUTED);
-  doc.text("apt_train.ie", margin, doc.internal.pageSize.getHeight() - 30);
+  doc.text("apttrains.com", margin, pageH - 30);
 
   // ===== WEEKLY PLAN =====
   doc.addPage();
@@ -79,22 +111,25 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
 
   const rows = DAYS.map((day) => {
     const d = menu.days[day];
+    const dt = dailyTotals?.[day] || {};
     return [
       DAY_LABELS[day],
       menu.recipes?.[d.breakfast]?.name || "—",
       menu.recipes?.[d.lunch]?.name || "—",
       menu.recipes?.[d.dinner]?.name || "—",
+      dt.kcal ? `${dt.kcal.toLocaleString()}` : "—",
     ];
   });
 
   autoTable(doc, {
     startY: 130,
-    head: [["Day", "Breakfast", "Lunch", "Dinner"]],
+    head: [["Day", "Breakfast", "Lunch", "Dinner", "kcal"]],
     body: rows,
     theme: "grid",
     styles: { fontSize: 10, cellPadding: 8, textColor: DARK, lineColor: [229, 239, 232] },
     headStyles: { fillColor: GREEN, textColor: [255, 255, 255], fontStyle: "bold" },
     alternateRowStyles: { fillColor: [248, 251, 249] },
+    columnStyles: { 4: { halign: "right", cellWidth: 60, fontStyle: "bold", textColor: GREEN } },
     margin: { left: margin, right: margin },
   });
 
@@ -129,9 +164,34 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
       148
     );
 
+    // Macros bar
+    if (r.macros) {
+      const labels = [
+        { k: "kcal", l: "kcal" },
+        { k: "protein", l: "Protein (g)" },
+        { k: "carbs", l: "Carbs (g)" },
+        { k: "fat", l: "Fat (g)" },
+      ];
+      const boxW = (pageW - margin * 2 - 24) / 4;
+      labels.forEach((m, i) => {
+        const x = margin + i * (boxW + 8);
+        doc.setDrawColor(229, 239, 232);
+        doc.setFillColor(243, 247, 244);
+        doc.roundedRect(x, 162, boxW, 46, 6, 6, "FD");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(...MUTED);
+        doc.text(m.l.toUpperCase(), x + 10, 178);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(...DARK);
+        doc.text(`${r.macros[m.k] ?? "—"}`, x + 10, 200);
+      });
+    }
+
     // Ingredients
     autoTable(doc, {
-      startY: 170,
+      startY: r.macros ? 224 : 170,
       head: [["Ingredient", "Qty", "Unit"]],
       body: r.ingredients.map((i) => [i.name, fmtQty(i.quantity), i.unit]),
       theme: "striped",
@@ -141,7 +201,6 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
       columnStyles: { 1: { halign: "right" }, 2: { halign: "left", cellWidth: 60 } },
     });
 
-    // Instructions
     let y = doc.lastAutoTable.finalY + 28;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
@@ -155,7 +214,7 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
     r.instructions.forEach((step, i) => {
       y += 16;
       const wrapped = doc.splitTextToSize(`${i + 1}. ${step}`, pageW - margin * 2);
-      if (y + wrapped.length * 14 > doc.internal.pageSize.getHeight() - 60) {
+      if (y + wrapped.length * 14 > pageH - 60) {
         doc.addPage();
         drawHeader(doc, `Recipe · ${r.name}`);
         y = 130;
@@ -199,7 +258,7 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
     },
   });
 
-  // page numbers
+  // Page numbers
   const pageCount = doc.internal.getNumberOfPages();
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);
@@ -207,13 +266,13 @@ export function generateMealPlanPDF({ client, menu, shopping }) {
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
     doc.text(
-      `ABPT · bruddatrain · apt_train.ie    ·    Page ${p} / ${pageCount}`,
+      `APT · bruddatrain · apttrains.com    ·    Page ${p} / ${pageCount}`,
       margin,
-      doc.internal.pageSize.getHeight() - 24
+      pageH - 24
     );
   }
 
-  doc.save(`ABPT-MealPlan-${menu.week_start}.pdf`);
+  doc.save(`APT-MealPlan-${menu.week_start}.pdf`);
 }
 
 function drawHeader(doc, title) {
@@ -221,15 +280,18 @@ function drawHeader(doc, title) {
   doc.setFillColor(...GREEN);
   doc.rect(0, 0, pageW, 6, "F");
 
+  // Mini brand: red dot + APT
+  doc.setFillColor(...RED);
+  doc.circle(54, 46, 4, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...DARK);
-  doc.text("ABPT", 48, 50);
+  doc.text("APT", 62, 50);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...GREEN);
-  doc.text("bruddatrain", 88, 50);
+  doc.text("bruddatrain", 92, 50);
 
   doc.setFontSize(9);
   doc.setTextColor(...MUTED);

@@ -1,7 +1,7 @@
 """Seed data for ABPT meal prep recipes and weekly template."""
 import uuid
 
-def _r(slug, name, category, image_url, prep, servings, ingredients, instructions, tags=None):
+def _r(slug, name, category, image_url, prep, servings, ingredients, instructions, macros, tags=None):
     return {
         "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, slug)),
         "slug": slug,
@@ -12,11 +12,15 @@ def _r(slug, name, category, image_url, prep, servings, ingredients, instruction
         "servings": servings,
         "ingredients": ingredients,
         "instructions": instructions,
+        "macros": macros,  # per serving: {kcal, protein, carbs, fat} in g
         "tags": tags or [],
     }
 
 def ing(name, qty, unit):
     return {"name": name, "quantity": qty, "unit": unit}
+
+def m(kcal, protein, carbs, fat):
+    return {"kcal": kcal, "protein": protein, "carbs": carbs, "fat": fat}
 
 RECIPES_SEED = [
     _r(
@@ -29,6 +33,7 @@ RECIPES_SEED = [
          "Fry the bacon until crisp, then fry the eggs to your liking.",
          "Layer cheddar, egg, bacon and tomato on the bagel base.",
          "Top with the other half and serve warm."],
+        m(580, 28, 48, 30),
         ["high-protein", "quick"],
     ),
     _r(
@@ -41,6 +46,7 @@ RECIPES_SEED = [
          "Blend in oats and baking powder until smooth.",
          "Pour small ladles onto a hot non-stick pan; flip when bubbles form.",
          "Stack and drizzle with honey."],
+        m(340, 13, 56, 7),
         ["sweet", "kid-friendly"],
     ),
     _r(
@@ -53,11 +59,12 @@ RECIPES_SEED = [
          "Stir in honey and seal the jar.",
          "Refrigerate overnight.",
          "Top with blueberries before serving."],
+        m(420, 20, 64, 8),
         ["meal-prep", "vegetarian"],
     ),
     _r(
         "omelette", "Three-Egg Omelette", "breakfast",
-        "https://images.unsplash.com/photo-1612240498936-65f5101365d2?w=900&q=80",
+        "https://images.unsplash.com/photo-1510693206972-df098062cb71?w=900&q=80",
         10, 1,
         [ing("Egg", 3, "pcs"), ing("Cheddar cheese", 30, "g"), ing("Mushrooms", 50, "g"),
          ing("Spinach", 30, "g"), ing("Butter", 10, "g"), ing("Salt", 1, "g")],
@@ -65,6 +72,7 @@ RECIPES_SEED = [
          "Sauté mushrooms and spinach in butter.",
          "Pour in eggs, scatter cheese on top.",
          "Fold once set and serve immediately."],
+        m(420, 28, 4, 32),
         ["high-protein", "low-carb"],
     ),
     _r(
@@ -77,6 +85,7 @@ RECIPES_SEED = [
          "Mash avocado with lemon juice and a pinch of salt.",
          "Fry eggs in olive oil keeping yolks runny.",
          "Spread avocado on toast, top with eggs and chili flakes."],
+        m(520, 20, 42, 30),
         ["vegetarian", "quick"],
     ),
     _r(
@@ -89,6 +98,7 @@ RECIPES_SEED = [
          "Top with granola and a drizzle of honey.",
          "Slice banana and kiwi, scatter with berries.",
          "Serve chilled."],
+        m(460, 22, 78, 8),
         ["vegetarian", "no-cook"],
     ),
     _r(
@@ -102,6 +112,7 @@ RECIPES_SEED = [
          "Slice chicken, sear in olive oil until golden.",
          "Add garlic, ginger, peppers and broccoli; stir fry 4 minutes.",
          "Splash in soy sauce, toss, and serve over rice."],
+        m(560, 45, 62, 12),
         ["high-protein"],
     ),
     _r(
@@ -115,6 +126,7 @@ RECIPES_SEED = [
          "Sear chicken until cooked through, then slice.",
          "Warm black beans and sweetcorn.",
          "Assemble bowl: rice base, beans, corn, chicken, sliced avocado and salsa. Squeeze lime over."],
+        m(640, 44, 72, 18),
         ["high-protein", "meal-prep"],
     ),
     _r(
@@ -128,6 +140,7 @@ RECIPES_SEED = [
          "Toss leaves, tomatoes, cucumber and feta in a bowl.",
          "Top with chicken.",
          "Dress with olive oil and lemon juice."],
+        m(480, 52, 14, 24),
         ["low-carb", "high-protein"],
     ),
     _r(
@@ -140,6 +153,7 @@ RECIPES_SEED = [
          "Lay tortilla flat; spread leaves and tuna mix.",
          "Add sliced avocado.",
          "Roll tightly and slice in half."],
+        m(450, 32, 38, 18),
         ["quick"],
     ),
     _r(
@@ -153,6 +167,7 @@ RECIPES_SEED = [
          "Form mince into 2 patties, season generously.",
          "Sear 4 min per side, melt cheddar on top.",
          "Build burger in bun with lettuce and tomato; serve with fries."],
+        m(820, 46, 70, 38),
         ["irish", "comfort"],
     ),
     _r(
@@ -165,6 +180,7 @@ RECIPES_SEED = [
          "Melt butter with minced garlic.",
          "Add cream and parmesan; simmer to thicken.",
          "Toss pasta in sauce; finish with black pepper."],
+        m(740, 22, 78, 38),
         ["comfort", "vegetarian"],
     ),
     _r(
@@ -178,6 +194,7 @@ RECIPES_SEED = [
          "Place salmon on tray with broccoli and asparagus; drizzle olive oil, lemon and garlic.",
          "Roast 12-15 minutes until salmon flakes.",
          "Serve over rice with pan juices."],
+        m(620, 38, 64, 22),
         ["high-protein", "omega-3"],
     ),
     _r(
@@ -191,6 +208,7 @@ RECIPES_SEED = [
          "Sear steak 3-4 minutes per side; baste with butter, garlic and rosemary.",
          "Rest steak 5 minutes; meanwhile blanch asparagus.",
          "Slice steak and plate with potatoes and asparagus."],
+        m(780, 52, 56, 38),
         ["high-protein", "irish"],
     ),
     _r(
@@ -203,6 +221,7 @@ RECIPES_SEED = [
          "Pour into a bowl.",
          "Top with remaining berries, granola and honey.",
          "Serve immediately."],
+        m(380, 14, 72, 6),
         ["vegetarian", "no-cook"],
     ),
 ]

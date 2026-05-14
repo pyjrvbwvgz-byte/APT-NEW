@@ -71,6 +71,40 @@ export default function RecipePage() {
                     ))}
                   </div>
 
+                  {recipe.macros && (
+                    <div
+                      className="mt-6 grid grid-cols-4 gap-3"
+                      data-testid="recipe-macros"
+                    >
+                      {[
+                        { k: "kcal", label: "kcal", color: "#10B981" },
+                        { k: "protein", label: "Protein", color: "#E07A5F", unit: "g" },
+                        { k: "carbs", label: "Carbs", color: "#D4A24C", unit: "g" },
+                        { k: "fat", label: "Fat", color: "#5C7063", unit: "g" },
+                      ].map((m) => (
+                        <div
+                          key={m.k}
+                          className="border border-[#E5EFE8] rounded-xl px-3 py-3 bg-white"
+                        >
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C7063]">
+                            {m.label}
+                          </div>
+                          <div className="mt-1 flex items-baseline gap-1">
+                            <span
+                              className="font-display text-2xl font-bold tabular-nums"
+                              style={{ color: m.color }}
+                            >
+                              {recipe.macros[m.k]}
+                            </span>
+                            {m.unit && (
+                              <span className="text-xs text-[#5C7063]">{m.unit}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <h2 className="mt-10 font-display text-2xl font-semibold text-[#111C15]">
                     Instructions
                   </h2>

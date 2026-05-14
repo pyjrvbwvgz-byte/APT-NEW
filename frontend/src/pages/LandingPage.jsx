@@ -39,9 +39,9 @@ export default function LandingPage() {
               <span className="text-[#10B981]">Train stronger.</span>
             </h1>
             <p className="mt-6 text-lg text-[#5C7063] max-w-xl leading-relaxed">
-              ABPT · <em className="text-[#1A3622] not-italic font-medium">bruddatrain</em> —
-              your no-nonsense weekly meal plan. Simple recipes, an auto
-              shopping list, and a downloadable PDF you can take to the shop.
+              APT · <em className="text-[#1A3622] not-italic font-medium">bruddatrain</em> —
+              your no-nonsense weekly meal plan from <span className="font-medium text-[#1A3622]">Abraham's Personal Training</span>.
+              Simple recipes, an auto shopping list, and a downloadable PDF you can take to the shop.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/auth" data-testid="hero-cta-access">

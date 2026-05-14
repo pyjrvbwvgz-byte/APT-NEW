@@ -35,7 +35,7 @@ export default function AuthPage() {
     try {
       const c = await register(name, email);
       setIssuedCode(c.code);
-      toast.success("Welcome to ABPT! Your code is ready.");
+      toast.success("Welcome to APT! Your code is ready.");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Registration failed");
     } finally {

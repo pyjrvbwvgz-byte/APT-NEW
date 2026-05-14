@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 
 from recipes_seed import RECIPES_SEED, WEEKLY_TEMPLATE
+from email_service import send_code_email
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -127,7 +128,10 @@ async def require_admin(authorization: Optional[str] = Header(None)):
 # ---------- routes ----------
 @api_router.get("/")
 async def root():
-    return {"message": "ABPT meal prep API", "tagline": "bruddatrain"}
+    return {"message": "APT meal prep API", "tagline": "bruddatrain"}
+
+def _expires_label(iso: str) -> str:
+    return datetime.fromisoformat(iso).strftime("%a %d %b %Y")
 
 @api_router.post("/auth/register")
 async def register(payload: RegisterIn):
@@ -147,6 +151,11 @@ async def register(payload: RegisterIn):
         "active": True,
     }
     await db.clients.insert_one(c)
+    # fire-and-forget email (do not block response on email errors)
+    try:
+        await send_code_email(c["email"], c["name"], code, _expires_label(c["code_expires_at"]))
+    except Exception as e:
+        logger.warning("email send failed: %s", e)
     return {
         "client": {k: c[k] for k in ("id", "name", "email", "code", "code_expires_at", "created_at")},
         "token": f"{c['id']}:{c['code']}",
@@ -175,6 +184,10 @@ async def refresh_code(client_in: dict = Depends(get_current_client)):
         {"id": client_in["id"]},
         {"$set": {"code": new_code, "code_expires_at": new_exp}},
     )
+    try:
+        await send_code_email(client_in["email"], client_in["name"], new_code, _expires_label(new_exp))
+    except Exception as e:
+        logger.warning("email send failed: %s", e)
     return {"code": new_code, "code_expires_at": new_exp, "token": f"{client_in['id']}:{new_code}"}
 
 @api_router.get("/auth/me")
@@ -265,6 +278,12 @@ async def admin_regen_code(client_id: str, _: bool = Depends(require_admin)):
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
+    c = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if c:
+        try:
+            await send_code_email(c["email"], c["name"], new_code, _expires_label(new_exp))
+        except Exception as e:
+            logger.warning("email send failed: %s", e)
     return {"code": new_code, "code_expires_at": new_exp}
 
 class MenuUpdateIn(BaseModel):

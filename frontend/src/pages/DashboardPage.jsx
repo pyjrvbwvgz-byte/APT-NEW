@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
@@ -7,7 +7,7 @@ import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { generateMealPlanPDF } from "../lib/pdf";
-import { FileDown, RefreshCw, LogOut, Clock, ChefHat, ShoppingBasket } from "lucide-react";
+import { FileDown, RefreshCw, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet } from "lucide-react";
 
 const DAY_LABELS = {
   Mon: "Monday",
@@ -69,7 +69,7 @@ export default function DashboardPage() {
     if (!menu || !shopping) return;
     setDownloading(true);
     try {
-      generateMealPlanPDF({ client, menu, shopping });
+      generateMealPlanPDF({ client, menu, shopping, totals: weeklyTotals, dailyTotals });
       toast.success("PDF downloaded");
     } catch (err) {
       toast.error("PDF generation failed");
@@ -77,6 +77,32 @@ export default function DashboardPage() {
       setDownloading(false);
     }
   };
+
+  // Compute daily and weekly macros
+  const { dailyTotals, weeklyTotals } = useMemo(() => {
+    if (!menu) return { dailyTotals: {}, weeklyTotals: { kcal: 0, protein: 0, carbs: 0, fat: 0 } };
+    const daily = {};
+    const weekly = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    DAYS.forEach((d) => {
+      const day = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+      ["breakfast", "lunch", "dinner"].forEach((meal) => {
+        const slug = menu.days?.[d]?.[meal];
+        const r = slug && menu.recipes?.[slug];
+        if (r?.macros) {
+          day.kcal += r.macros.kcal || 0;
+          day.protein += r.macros.protein || 0;
+          day.carbs += r.macros.carbs || 0;
+          day.fat += r.macros.fat || 0;
+        }
+      });
+      daily[d] = day;
+      weekly.kcal += day.kcal;
+      weekly.protein += day.protein;
+      weekly.carbs += day.carbs;
+      weekly.fat += day.fat;
+    });
+    return { dailyTotals: daily, weeklyTotals: weekly };
+  }, [menu]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
@@ -149,6 +175,47 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* WEEKLY MACROS */}
+          <section className="mb-12">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <MacroCard
+                label="Weekly calories"
+                value={weeklyTotals.kcal.toLocaleString()}
+                unit="kcal"
+                Icon={Flame}
+                color="#10B981"
+                testid="macro-kcal"
+              />
+              <MacroCard
+                label="Protein"
+                value={weeklyTotals.protein.toLocaleString()}
+                unit="g"
+                Icon={Beef}
+                color="#E07A5F"
+                testid="macro-protein"
+              />
+              <MacroCard
+                label="Carbs"
+                value={weeklyTotals.carbs.toLocaleString()}
+                unit="g"
+                Icon={Wheat}
+                color="#D4A24C"
+                testid="macro-carbs"
+              />
+              <MacroCard
+                label="Fat"
+                value={weeklyTotals.fat.toLocaleString()}
+                unit="g"
+                Icon={Droplet}
+                color="#5C7063"
+                testid="macro-fat"
+              />
+            </div>
+            <p className="mt-3 text-xs text-[#5C7063]">
+              Totals across all 21 meals · approx. {Math.round(weeklyTotals.kcal / 7).toLocaleString()} kcal / day
+            </p>
+          </section>
+
           {/* WEEK GRID */}
           <section className="mb-16">
             <div className="flex items-center gap-2 mb-6">
@@ -168,12 +235,22 @@ export default function DashboardPage() {
                     className="bg-white border border-[#E5EFE8] rounded-2xl overflow-hidden flex flex-col"
                     data-testid={`day-card-${day}`}
                   >
-                    <div className="px-4 py-3 border-b border-[#E5EFE8] bg-[#F3F7F4]/60">
-                      <div className="text-[10px] uppercase tracking-[0.2em] text-[#5C7063]">
-                        Day {di + 1}
+                    <div className="px-4 py-3 border-b border-[#E5EFE8] bg-[#F3F7F4]/60 flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-[#5C7063]">
+                          Day {di + 1}
+                        </div>
+                        <div className="font-display font-semibold text-[#111C15]">
+                          {DAY_LABELS[day]}
+                        </div>
                       </div>
-                      <div className="font-display font-semibold text-[#111C15]">
-                        {DAY_LABELS[day]}
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C7063]">
+                          kcal
+                        </div>
+                        <div className="font-display font-bold text-[#10B981] tabular-nums">
+                          {dailyTotals[day]?.kcal?.toLocaleString() || "—"}
+                        </div>
                       </div>
                     </div>
                     <div className="p-4 flex-1 flex flex-col gap-3">
@@ -255,6 +332,33 @@ export default function DashboardPage() {
         </div>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function MacroCard({ label, value, unit, Icon, color, testid }) {
+  return (
+    <div
+      className="bg-white border border-[#E5EFE8] rounded-2xl p-5 flex items-start gap-4"
+      data-testid={testid}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center flex-none"
+        style={{ backgroundColor: `${color}1A`, color }}
+      >
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C7063]">
+          {label}
+        </div>
+        <div className="mt-1 flex items-baseline gap-1">
+          <span className="font-display text-2xl lg:text-3xl font-bold text-[#111C15] tabular-nums">
+            {value}
+          </span>
+          <span className="text-sm text-[#5C7063]">{unit}</span>
+        </div>
+      </div>
     </div>
   );
 }
