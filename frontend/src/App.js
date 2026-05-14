@@ -7,6 +7,8 @@ import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import RecipePage from "./pages/RecipePage";
 import AdminPage from "./pages/AdminPage";
+import SubscribePage from "./pages/SubscribePage";
+import SubscribeSuccessPage from "./pages/SubscribeSuccessPage";
 
 function RequireAuth({ children }) {
   const { client, loading } = useAuth();
@@ -30,6 +32,8 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/subscribe" element={<SubscribePage />} />
+            <Route path="/subscribe/success" element={<SubscribeSuccessPage />} />
             <Route
               path="/dashboard"
               element={

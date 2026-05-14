@@ -1,0 +1,39 @@
+{
+  "summary": "Full backend + frontend testing for ABPT meal-prep refactor (Stripe subscriptions + admin-issued rotating codes). Backend pytest: 24/25 passed (96%). 1 critical failure: GET /api/payments/checkout/status/{session_id} returns 500 from emergentintegrations Stripe SDK ('No such checkout.session') even immediately after the session is created and the Stripe checkout URL is valid. This breaks the /subscribe/success polling flow on the frontend. All other backend endpoints (pricing, admin auth, admin client CRUD, rotate-codes, code login, recipes, menu, shopping-list, payments/checkout creation) verified working. Frontend: Landing (hero + 2 CTAs + pricing cards), /subscribe (form → redirects to checkout.stripe.com — verified), /auth (4-digit OTP via OTPInput → /dashboard), /dashboard (21 meals across 7 days, weekly macros card, daily kcal per day, shopping list with 55 items, PDF download 'APT-MealPlan-2026-05-11.pdf'), /recipe/<slug> (macros tiles + ingredients + instructions), /admin (password-gated, create-client form, Rotate codes button shows 'Rotated 6 codes · digest emailed' toast, clients table). All flows working end-to-end except subscription status polling.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/payments/checkout/status/{session_id}", "issue": "Returns 500 immediately after a fresh checkout session is created. emergentintegrations.payments.stripe.checkout.CheckoutError: 'Failed to retrieve session status: No such checkout.session: cs_test_...'. Stripe checkout URL itself is valid and reachable, but the get_checkout_status call cannot find the session. This breaks SubscribeSuccessPage polling — paid users will never see their subscription activate. Possible root cause: emergentintegrations SDK uses different Stripe API key/account for create vs status, or returned session_id doesn't match what Stripe stored. Need main agent to investigate the emergentintegrations layer.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/payments/checkout/status/<unknown_session>", "issue": "Returns 500 via CheckoutError instead of explicit 404 — the early 'Session not found' check works only when tx row exists; non-existent session_id leaks 500 from Stripe SDK. Consider catching CheckoutError and mapping to 404."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Subscribe success polling", "issue": "Will surface a 500 error on /subscribe/success page because backend /api/payments/checkout/status returns 500 — see backend critical issue", "affected_selectors": ["[data-testid=\"goto-dashboard-btn\"]"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "CRITICAL: Fix /api/payments/checkout/status/{session_id} 500 — emergentintegrations SDK cannot retrieve a freshly created session. Either the api_key context differs between create/status calls, or the session id format is wrong. Check emergentintegrations.payments.stripe.checkout source / verify STRIPE_API_KEY=sk_test_emergent is correctly passed to get_checkout_status. Without this, paid Stripe customers cannot activate their subscription.",
+    "MINOR: Catch CheckoutError in checkout_status() and convert to HTTP 404/502 instead of leaking 500."
+  ],
+  "critical_code_review_comments": [
+    "/api/payments/checkout/status raises uncaught CheckoutError → 500. Wrap stripe_checkout.get_checkout_status in try/except.",
+    "weekly_rotation_loop spawns a background task in @app.on_event('startup'). On worker restart this is fine but FastAPI's lifespan handler is preferred.",
+    "make_token() returns f\"{id}:{code}\" with empty code when subscription expires and no code exists — auth check still works because has_valid_code returns False. OK but worth a test.",
+    "admin password defaults to plaintext 'abpt2025' in env. Acceptable for MVP.",
+    "CORS allow_origins='*' with allow_credentials=True is invalid per spec but harmless since auth uses Authorization header.",
+    "Stripe session_id is taken verbatim from URL path — consider validating format to fail fast with 400 instead of 500."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "96% (24/25)", "frontend": "100%"},
+  "test_credentials": "Admin password: abpt2025. Client codes are admin-issued; tests create temporary clients via /api/admin/clients (cleaned up after).",
+  "seed_data_creation": "Tests create temporary 'TEST_*'/'test_*' prefixed clients via /api/admin/clients and delete them on teardown.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Backend pytest regression suite: /app/backend/tests/backend_test.py — run with `REACT_APP_BACKEND_URL=<url> pytest /app/backend/tests/backend_test.py -v`. 24/25 pass. The single failure (TestPayments::test_create_checkout) is the known critical 500 on /api/payments/checkout/status. Recipe slugs in DB are real names like 'omelette', 'banana-pancakes', etc. — NOT 'meal-prep-pro-19' (that's the preview host slug, mentioned by mistake in the spec). Frontend code-login uses OTPInput component with data-testid='otp-digit-0'..'otp-digit-3' (one input per digit). Dashboard day cards use testid pattern data-testid='day-card-Mon' (capitalised 3-letter abbreviation), not 'day-card-monday'. PDF download works (filename pattern APT-MealPlan-YYYY-MM-DD.pdf).",
+  "rca of the issue": "/api/payments/checkout/status 500: emergentintegrations.payments.stripe.checkout.get_checkout_status(session_id) raises CheckoutError 'No such checkout.session: cs_test_...'. Reproduced 3 times back-to-back on a session created seconds earlier whose checkout URL is reachable. Mitigation: (1) wrap call in try/except and return 502 with retry hint; (2) investigate whether emergentintegrations is using a different STRIPE_API_KEY for create vs status (possible internal routing bug); (3) consider passing api_key explicitly to both calls or using the secret returned in session response."
+}

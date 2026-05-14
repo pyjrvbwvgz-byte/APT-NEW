@@ -17,7 +17,7 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 
-def _code_email_html(name: str, code: str, expires_label: str) -> str:
+def _shell(inner_html: str) -> str:
     return f"""\
 <!doctype html>
 <html><body style="margin:0;padding:0;background:#FCFDFB;font-family:Arial,Helvetica,sans-serif;color:#111C15;">
@@ -31,6 +31,18 @@ def _code_email_html(name: str, code: str, expires_label: str) -> str:
         </div>
         <div style="font-size:11px;color:#10B981;letter-spacing:0.2em;text-transform:uppercase;margin-top:2px;">bruddatrain</div>
       </td></tr>
+      {inner_html}
+      <tr><td style="padding:18px 36px;background:#F3F7F4;border-top:1px solid #E5EFE8;">
+        <div style="font-size:11px;color:#5C7063;text-align:center;">APT · Abraham's Personal Training · apttrains.com</div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+
+def _code_email_html(name: str, code: str, expires_label: str) -> str:
+    inner = f"""\
       <tr><td style="padding:24px 36px 0 36px;">
         <div style="font-size:28px;font-weight:bold;letter-spacing:-0.02em;line-height:1.2;">Hey {name.split(' ')[0]},</div>
         <div style="font-size:16px;color:#5C7063;margin-top:8px;line-height:1.55;">Your weekly access code is ready. Use it to log in and grab your meal plan.</div>
@@ -46,14 +58,37 @@ def _code_email_html(name: str, code: str, expires_label: str) -> str:
       </td></tr>
       <tr><td style="padding:0 36px 36px 36px;">
         <div style="font-size:14px;color:#5C7063;line-height:1.6;">Eat well, train hard. If you didn’t request this code, ignore this email.</div>
+      </td></tr>"""
+    return _shell(inner)
+
+
+def _digest_html(rotated: list, expires_label: str) -> str:
+    rows = "".join(
+        f"""<tr>
+              <td style="padding:10px 12px;border-bottom:1px solid #E5EFE8;font-size:14px;">{r['name']}</td>
+              <td style="padding:10px 12px;border-bottom:1px solid #E5EFE8;font-size:13px;color:#5C7063;">{r['email']}</td>
+              <td style="padding:10px 12px;border-bottom:1px solid #E5EFE8;font-family:Menlo,monospace;font-size:18px;color:#10B981;letter-spacing:.2em;font-weight:bold;text-align:right;">{r['code']}</td>
+            </tr>"""
+        for r in rotated
+    )
+    inner = f"""\
+      <tr><td style="padding:24px 36px 0 36px;">
+        <div style="font-size:24px;font-weight:bold;letter-spacing:-0.02em;line-height:1.2;">This week's access codes</div>
+        <div style="font-size:14px;color:#5C7063;margin-top:6px;line-height:1.55;">Valid until <strong style="color:#111C15;">{expires_label}</strong>. Share each code only with the client it belongs to.</div>
       </td></tr>
-      <tr><td style="padding:18px 36px;background:#F3F7F4;border-top:1px solid #E5EFE8;">
-        <div style="font-size:11px;color:#5C7063;text-align:center;">APT · Abraham's Personal Training · apttrains.com</div>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>"""
+      <tr><td style="padding:18px 28px 28px 28px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E5EFE8;border-radius:12px;overflow:hidden;background:#FCFDFB;">
+          <thead>
+            <tr style="background:#F3F7F4;">
+              <th align="left" style="padding:10px 12px;font-size:10px;color:#5C7063;letter-spacing:.2em;text-transform:uppercase;">Client</th>
+              <th align="left" style="padding:10px 12px;font-size:10px;color:#5C7063;letter-spacing:.2em;text-transform:uppercase;">Email</th>
+              <th align="right" style="padding:10px 12px;font-size:10px;color:#5C7063;letter-spacing:.2em;text-transform:uppercase;">Code</th>
+            </tr>
+          </thead>
+          <tbody>{rows or '<tr><td colspan=3 style="padding:14px;color:#5C7063;font-size:14px;">No active coaching clients this week.</td></tr>'}</tbody>
+        </table>
+      </td></tr>"""
+    return _shell(inner)
 
 
 async def send_code_email(to_email: str, name: str, code: str, expires_label: str) -> bool:
@@ -72,4 +107,23 @@ async def send_code_email(to_email: str, name: str, code: str, expires_label: st
         return True
     except Exception as e:
         logger.error("Failed to send code email to %s: %s", to_email, e)
+        return False
+
+
+async def send_admin_digest(admin_email: str, rotated: list, expires_label: str) -> bool:
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set; skipping digest")
+        return False
+    params = {
+        "from": SENDER_EMAIL,
+        "to": [admin_email],
+        "subject": f"APT · weekly codes ({len(rotated)} clients) until {expires_label}",
+        "html": _digest_html(rotated, expires_label),
+    }
+    try:
+        await asyncio.to_thread(resend.Emails.send, params)
+        logger.info("Sent admin digest to %s (%d clients)", admin_email, len(rotated))
+        return True
+    except Exception as e:
+        logger.error("Failed to send admin digest: %s", e)
         return False

@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { ShieldCheck, RefreshCw, Trash2, Save, LogOut } from "lucide-react";
+import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCard } from "lucide-react";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -100,6 +100,10 @@ function AdminDashboard({ onLogout }) {
   const [recipes, setRecipes] = useState([]);
   const [menu, setMenu] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rotating, setRotating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -151,6 +155,42 @@ function AdminDashboard({ onLogout }) {
     }
   };
 
+  const createClient = async (e) => {
+    e.preventDefault();
+    if (!newName.trim() || !newEmail.trim()) {
+      toast.error("Name and email required");
+      return;
+    }
+    setCreating(true);
+    try {
+      const r = await adminApi.post(`/admin/clients`, {
+        name: newName.trim(),
+        email: newEmail.trim(),
+      });
+      toast.success(`Client created — code: ${r.data.code}`);
+      setClients((cs) => [...cs, r.data]);
+      setNewName("");
+      setNewEmail("");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to create");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const rotateAll = async () => {
+    setRotating(true);
+    try {
+      const r = await adminApi.post(`/admin/rotate-codes`);
+      toast.success(`Rotated ${r.data.rotated?.length || 0} codes · digest emailed`);
+      await load();
+    } catch {
+      toast.error("Rotate failed");
+    } finally {
+      setRotating(false);
+    }
+  };
+
   const updateMenuSlot = (day, meal, slug) => {
     setMenu((m) => ({
       ...m,
@@ -185,21 +225,80 @@ function AdminDashboard({ onLogout }) {
       />
       <main className="flex-1 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-14">
-          <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">
-              Admin
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">
+                Admin
+              </div>
+              <h1 className="font-display text-4xl font-bold text-[#111C15] tracking-tight mt-2">
+                Control panel
+              </h1>
             </div>
-            <h1 className="font-display text-4xl font-bold text-[#111C15] tracking-tight mt-2">
-              Control panel
-            </h1>
+            <Button
+              onClick={rotateAll}
+              disabled={rotating}
+              variant="outline"
+              className="border-[#E5EFE8] hover:bg-[#F3F7F4]"
+              data-testid="rotate-codes-btn"
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              {rotating ? "Rotating…" : "Rotate weekly codes & email digest"}
+            </Button>
           </div>
+
+          {/* Create coaching client */}
+          <section>
+            <h2 className="font-display text-2xl font-semibold text-[#111C15] mb-4">
+              Add coaching client
+            </h2>
+            <form
+              onSubmit={createClient}
+              className="bg-white border border-[#E5EFE8] rounded-2xl p-6 flex flex-col md:flex-row gap-4 items-end"
+            >
+              <div className="flex-1 w-full">
+                <Label htmlFor="new-name">Name</Label>
+                <Input
+                  id="new-name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Client name"
+                  className="mt-1.5"
+                  data-testid="new-client-name"
+                />
+              </div>
+              <div className="flex-1 w-full">
+                <Label htmlFor="new-email">Email</Label>
+                <Input
+                  id="new-email"
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="client@email.com"
+                  className="mt-1.5"
+                  data-testid="new-client-email"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={creating}
+                className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-11 px-6"
+                data-testid="create-client-btn"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                {creating ? "…" : "Create + email code"}
+              </Button>
+            </form>
+            <p className="text-xs text-[#5C7063] mt-2">
+              A 4-digit code is generated and emailed to your inbox so you can pass it on. Codes rotate every Monday.
+            </p>
+          </section>
 
           {/* Clients */}
           <section>
             <h2 className="font-display text-2xl font-semibold text-[#111C15] mb-4">
               Clients ({clients.length})
             </h2>
-            <div className="bg-white border border-[#E5EFE8] rounded-2xl overflow-hidden">
+            <div className="bg-white border border-[#E5EFE8] rounded-2xl overflow-x-auto">
               {loading ? (
                 <div className="p-6 text-[#5C7063]">Loading…</div>
               ) : clients.length === 0 ? (
@@ -210,8 +309,9 @@ function AdminDashboard({ onLogout }) {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Code</TableHead>
-                      <TableHead>Expires</TableHead>
+                      <TableHead>Code expires</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -219,24 +319,48 @@ function AdminDashboard({ onLogout }) {
                     {clients.map((c) => (
                       <TableRow key={c.id} data-testid={`client-row-${c.id}`}>
                         <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{c.email}</TableCell>
+                        <TableCell className="text-sm">{c.email}</TableCell>
                         <TableCell>
-                          <Badge className="bg-[#10B981]/10 text-[#059669] hover:bg-[#10B981]/15 font-mono tracking-widest">
-                            {c.code}
-                          </Badge>
+                          {c.is_subscribed ? (
+                            <Badge className="bg-[#10B981] text-white hover:bg-[#059669]">
+                              <CreditCard className="w-3 h-3 mr-1" /> Subscriber
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-[#E5EFE8] text-[#5C7063]">
+                              Coaching
+                            </Badge>
+                          )}
+                          {c.subscription_expires_at && c.is_subscribed && (
+                            <div className="text-[10px] text-[#5C7063] mt-1">
+                              until {new Date(c.subscription_expires_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {c.code ? (
+                            <Badge className="bg-[#10B981]/10 text-[#059669] hover:bg-[#10B981]/15 font-mono tracking-widest">
+                              {c.code}
+                            </Badge>
+                          ) : (
+                            <span className="text-[#5C7063] text-xs">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-[#5C7063]">
-                          {new Date(c.code_expires_at).toLocaleDateString()}
+                          {c.code_expires_at
+                            ? new Date(c.code_expires_at).toLocaleDateString()
+                            : "—"}
                         </TableCell>
-                        <TableCell className="text-right space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => regenCode(c.id)}
-                            data-testid={`regen-${c.id}`}
-                          >
-                            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Code
-                          </Button>
+                        <TableCell className="text-right space-x-2 whitespace-nowrap">
+                          {!c.is_subscribed && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => regenCode(c.id)}
+                              data-testid={`regen-${c.id}`}
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 mr-1" /> Code
+                            </Button>
+                          )}
                           <Button
                             variant="destructive"
                             size="sm"

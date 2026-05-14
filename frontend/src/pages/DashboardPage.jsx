@@ -7,7 +7,7 @@ import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { generateMealPlanPDF } from "../lib/pdf";
-import { FileDown, RefreshCw, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet } from "lucide-react";
+import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet } from "lucide-react";
 
 const DAY_LABELS = {
   Mon: "Monday",
@@ -29,7 +29,7 @@ function daysUntil(iso) {
 }
 
 export default function DashboardPage() {
-  const { client, logout, refreshCode } = useAuth();
+  const { client, logout } = useAuth();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(null);
   const [shopping, setShopping] = useState(null);
@@ -55,15 +55,6 @@ export default function DashboardPage() {
   useEffect(() => {
     loadAll();
   }, []);
-
-  const onRefreshCode = async () => {
-    try {
-      const r = await refreshCode();
-      toast.success(`New code: ${r.code}`);
-    } catch (err) {
-      toast.error("Could not refresh code");
-    }
-  };
 
   const onDownloadPDF = async () => {
     if (!menu || !shopping) return;
@@ -109,14 +100,25 @@ export default function DashboardPage() {
       <Header
         right={
           <>
-            <Badge
-              variant="outline"
-              className="hidden sm:inline-flex border-[#E5EFE8] text-[#5C7063]"
-              data-testid="header-code-badge"
-            >
-              <Clock className="w-3.5 h-3.5 mr-1 text-[#10B981]" />
-              Code: {client?.code} · {daysUntil(client?.code_expires_at)}
-            </Badge>
+            {client?.is_subscribed ? (
+              <Badge
+                variant="outline"
+                className="hidden sm:inline-flex border-[#10B981] text-[#10B981]"
+                data-testid="header-status-badge"
+              >
+                <Clock className="w-3.5 h-3.5 mr-1" />
+                Subscriber · until {client?.subscription_expires_at ? new Date(client.subscription_expires_at).toLocaleDateString() : "—"}
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="hidden sm:inline-flex border-[#E5EFE8] text-[#5C7063]"
+                data-testid="header-status-badge"
+              >
+                <Clock className="w-3.5 h-3.5 mr-1 text-[#10B981]" />
+                Code: {client?.code} · {daysUntil(client?.code_expires_at)}
+              </Badge>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -155,14 +157,6 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                onClick={onRefreshCode}
-                className="border-[#E5EFE8] hover:bg-[#F3F7F4]"
-                data-testid="refresh-code-btn"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" /> Refresh code
-              </Button>
               <Button
                 onClick={onDownloadPDF}
                 disabled={downloading || loading}
