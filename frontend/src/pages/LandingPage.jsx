@@ -31,8 +31,19 @@ export default function LandingPage() {
       />
 
       {/* HERO */}
-      <section className="relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 lg:pt-24 lg:pb-20 grid lg:grid-cols-12 gap-10 items-center">
+      <section className="relative overflow-hidden">
+        {/* Large faded APT watermark behind hero */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center select-none"
+        >
+          <img
+            src="/brand/apt-mark.png"
+            alt=""
+            className="w-[140%] max-w-none opacity-[0.08] lg:opacity-[0.1] -translate-y-4"
+          />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 lg:pt-24 lg:pb-20 grid lg:grid-cols-12 gap-10 items-center">
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#E5EFE8] bg-white px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-[#5C7063]">
               <Sparkles className="w-3.5 h-3.5 text-[#10B981]" />
