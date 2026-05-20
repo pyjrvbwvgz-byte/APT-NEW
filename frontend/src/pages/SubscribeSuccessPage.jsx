@@ -44,7 +44,7 @@ export default function SubscribeSuccessPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
+    <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 py-16">
         <div className="max-w-lg mx-auto px-4">

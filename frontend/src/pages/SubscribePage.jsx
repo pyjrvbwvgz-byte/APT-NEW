@@ -16,7 +16,7 @@ export default function SubscribePage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
+    <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 py-12 lg:py-20">
         <div className="max-w-5xl mx-auto px-4 grid lg:grid-cols-2 gap-10 items-start">

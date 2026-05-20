@@ -553,31 +553,78 @@ async def get_recipe(slug: str):
         raise HTTPException(status_code=404, detail="Recipe not found")
     return r
 
+async def get_or_create_client_menu(client_id: str) -> dict:
+    """Returns the client's personalised weekly menu, generating it if missing.
+    Avoids repeating recipes from last week."""
+    ws_iso = week_start().date().isoformat()
+    existing = await db.client_menus.find_one({"client_id": client_id, "week_start": ws_iso}, {"_id": 0})
+    if existing:
+        return existing
+    # Build recipe pool grouped by category
+    recipes = await db.recipes.find({}, {"_id": 0}).to_list(500)
+    by_cat: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": []}
+    for r in recipes:
+        cat = r.get("category", "lunch")
+        if cat in by_cat:
+            by_cat[cat].append(r["slug"])
+    # Pull last week's plan (if any) so we can avoid repeats
+    last = await db.client_menus.find_one(
+        {"client_id": client_id, "week_start": {"$lt": ws_iso}},
+        sort=[("week_start", -1)],
+        projection={"_id": 0},
+    )
+    last_slugs_per_meal: Dict[str, set] = {"breakfast": set(), "lunch": set(), "dinner": set()}
+    if last:
+        for d in DAY_KEYS:
+            for meal in last_slugs_per_meal.keys():
+                s = last.get("days", {}).get(d, {}).get(meal)
+                if s:
+                    last_slugs_per_meal[meal].add(s)
+    days = {}
+    rng = random.Random(f"{client_id}:{ws_iso}")
+    # For each meal, generate a shuffled list per client/week so the same client gets a stable plan
+    for meal in ("breakfast", "lunch", "dinner"):
+        pool = list(by_cat.get(meal, []))
+        # Prefer recipes not in last week's plan
+        fresh = [s for s in pool if s not in last_slugs_per_meal[meal]]
+        if len(fresh) >= 7:
+            pool = fresh
+        rng.shuffle(pool)
+        # Cycle through pool so each day gets a distinct recipe (when pool >= 7)
+        for i, day in enumerate(DAY_KEYS):
+            slug = pool[i % len(pool)] if pool else None
+            days.setdefault(day, {})[meal] = slug
+    menu = {
+        "client_id": client_id,
+        "week_start": ws_iso,
+        "days": days,
+        "created_at": now_utc().isoformat(),
+    }
+    await db.client_menus.insert_one(menu.copy())
+    return menu
+
+DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
 @api_router.get("/menu/current")
 async def current_menu(client_in: dict = Depends(get_current_client)):
-    ws = week_start().date().isoformat()
-    menu = await db.menus.find_one({"week_start": ws}, {"_id": 0})
-    if not menu:
-        menu = {"week_start": ws, "days": WEEKLY_TEMPLATE, "created_at": now_utc().isoformat()}
-        await db.menus.insert_one(menu.copy())
+    menu = await get_or_create_client_menu(client_in["id"])
     slugs = set()
     for day, meals in menu["days"].items():
         for s in meals.values():
-            slugs.add(s)
+            if s:
+                slugs.add(s)
     recipes_list = await db.recipes.find({"slug": {"$in": list(slugs)}}, {"_id": 0}).to_list(200)
     recipes_map = {r["slug"]: r for r in recipes_list}
     return {"week_start": menu["week_start"], "days": menu["days"], "recipes": recipes_map}
 
 @api_router.get("/menu/shopping-list")
 async def shopping_list(client_in: dict = Depends(get_current_client)):
-    ws = week_start().date().isoformat()
-    menu = await db.menus.find_one({"week_start": ws}, {"_id": 0})
-    if not menu:
-        raise HTTPException(status_code=404, detail="No menu set")
+    menu = await get_or_create_client_menu(client_in["id"])
     slugs = []
     for day, meals in menu["days"].items():
         for s in meals.values():
-            slugs.append(s)
+            if s:
+                slugs.append(s)
     recipes_list = await db.recipes.find({"slug": {"$in": slugs}}, {"_id": 0}).to_list(200)
     recipes_map = {r["slug"]: r for r in recipes_list}
     agg: Dict[str, Dict] = {}
@@ -585,13 +632,21 @@ async def shopping_list(client_in: dict = Depends(get_current_client)):
         r = recipes_map.get(slug)
         if not r:
             continue
-        for ing in r["ingredients"]:
-            key = f"{ing['name'].lower()}|{ing['unit'].lower()}"
+        for ingred in r["ingredients"]:
+            key = f"{ingred['name'].lower()}|{ingred['unit'].lower()}"
             if key not in agg:
-                agg[key] = {"name": ing["name"], "unit": ing["unit"], "quantity": 0.0}
-            agg[key]["quantity"] += float(ing["quantity"])
+                agg[key] = {"name": ingred["name"], "unit": ingred["unit"], "quantity": 0.0}
+            agg[key]["quantity"] += float(ingred["quantity"])
     items = sorted(agg.values(), key=lambda x: x["name"].lower())
     return {"week_start": menu["week_start"], "items": items}
+
+@api_router.post("/menu/reshuffle")
+async def reshuffle_menu(client_in: dict = Depends(get_current_client)):
+    """Regenerates the current week's menu for this client (deletes and recreates)."""
+    ws_iso = week_start().date().isoformat()
+    await db.client_menus.delete_many({"client_id": client_in["id"], "week_start": ws_iso})
+    menu = await get_or_create_client_menu(client_in["id"])
+    return {"ok": True, "week_start": menu["week_start"]}
 
 # ---------- admin ----------
 @api_router.post("/admin/login")

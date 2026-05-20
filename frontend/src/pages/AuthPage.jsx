@@ -36,7 +36,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
+    <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 py-12 lg:py-20">
         <div className="max-w-md mx-auto px-4">

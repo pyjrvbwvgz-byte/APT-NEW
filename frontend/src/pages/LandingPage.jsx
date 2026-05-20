@@ -5,7 +5,7 @@ import { ArrowRight, Salad, FileDown, KeyRound, Check, Sparkles, CreditCard, Shi
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
+    <div className="min-h-screen flex flex-col">
       <Header
         right={
           <>

@@ -7,7 +7,7 @@ import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { generateMealPlanPDF } from "../lib/pdf";
-import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet, CreditCard } from "lucide-react";
+import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet, CreditCard, Shuffle } from "lucide-react";
 
 const DAY_LABELS = {
   Mon: "Monday",
@@ -96,7 +96,7 @@ export default function DashboardPage() {
   }, [menu]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFDFB]">
+    <div className="min-h-screen flex flex-col">
       <Header
         right={
           <>
@@ -157,6 +157,25 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await api.post("/menu/reshuffle");
+                    await loadAll();
+                    toast.success("Fresh plan generated");
+                  } catch {
+                    toast.error("Could not reshuffle");
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="border-[#E5EFE8] hover:bg-[#F3F7F4]"
+                data-testid="reshuffle-btn"
+              >
+                <Shuffle className="w-4 h-4 mr-2" /> Reshuffle my plan
+              </Button>
               {client?.is_subscribed && (
                 <Button
                   variant="outline"
