@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request, UploadFile, File
+from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -30,6 +31,7 @@ from stripe_service import (
     STRIPE_PAYMENT_LINK,
 )
 from site_content_defaults import SITE_CONTENT_DEFAULTS, deep_merge
+from storage_service import init_storage, put_object, get_object
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -114,6 +116,10 @@ class CheckoutIn(BaseModel):
 # ---------- startup ----------
 @app.on_event("startup")
 async def startup_seed():
+    try:
+        init_storage()
+    except Exception as e:
+        logging.getLogger(__name__).warning("storage init failed at startup: %s", e)
     for r in RECIPES_SEED:
         await db.recipes.update_one({"slug": r["slug"]}, {"$set": r}, upsert=True)
     ws = week_start().date().isoformat()
@@ -870,6 +876,59 @@ async def admin_get_menu(_: bool = Depends(require_admin)):
     if not menu:
         menu = {"week_start": ws, "days": WEEKLY_TEMPLATE}
     return menu
+
+# ---------- file uploads ----------
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8 MB
+
+@api_router.post("/admin/upload")
+async def admin_upload(file: UploadFile = File(...), _: bool = Depends(require_admin)):
+    """Admin uploads an image; returns a public URL the frontend can save into image_url fields."""
+    ct = (file.content_type or "").lower()
+    if ct not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP or GIF images are allowed")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 8 MB)")
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
+    if ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
+        ext = ct.split("/")[-1].replace("jpeg", "jpg")
+    path = f"apt-meal-prep/uploads/{uuid.uuid4()}.{ext}"
+    try:
+        result = put_object(path, data, ct)
+    except Exception as e:
+        logger.exception("upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    stored_path = result.get("path", path)
+    await db.uploads.insert_one({
+        "id": str(uuid.uuid4()),
+        "storage_path": stored_path,
+        "original_filename": file.filename,
+        "content_type": ct,
+        "size": len(data),
+        "is_deleted": False,
+        "created_at": now_utc().isoformat(),
+    })
+    # Public URL — clients view meal/site images without auth
+    return {"url": f"/api/files/{stored_path}", "path": stored_path, "size": len(data)}
+
+@api_router.get("/files/{path:path}")
+async def serve_file(path: str):
+    """Public read-through cache for uploaded images (referenced by image_url fields)."""
+    record = await db.uploads.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        data, content_type = get_object(path)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found")
+    return Response(
+        content=data,
+        media_type=record.get("content_type") or content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 app.include_router(api_router)
 

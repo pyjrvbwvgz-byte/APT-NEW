@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../components/ui/select";
 import { Plus, Trash2, Save, ImageIcon } from "lucide-react";
+import ImageUploader from "../../components/ImageUploader";
 
 const CATEGORIES = ["breakfast", "lunch", "dinner"];
 
@@ -240,17 +241,15 @@ function MealEditor({ recipe, isNew, onClose, onSaved }) {
             <Input type="number" value={r.servings} onChange={(e) => set("servings", Number(e.target.value) || 1)} className="mt-1.5" />
           </div>
           <div className="md:col-span-2">
-            <Label>Image URL (paste any web image link)</Label>
-            <Input
-              value={r.image_url}
-              onChange={(e) => set("image_url", e.target.value)}
-              placeholder="https://images.unsplash.com/..."
-              className="mt-1.5"
-              data-testid="meal-image-url"
-            />
-            {r.image_url && (
-              <img src={r.image_url} alt="" className="mt-3 w-full h-48 object-cover rounded-lg border border-[#E5EFE8]" />
-            )}
+            <Label>Meal photo</Label>
+            <div className="mt-1.5">
+              <ImageUploader
+                value={r.image_url}
+                onChange={(v) => set("image_url", v)}
+                height="h-48"
+                testId="meal-image"
+              />
+            </div>
           </div>
         </div>
 

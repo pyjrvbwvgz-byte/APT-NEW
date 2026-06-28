@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Save, Plus, Trash2 } from "lucide-react";
+import ImageUploader from "../../components/ImageUploader";
 
 function Section({ title, children }) {
   return (
@@ -96,11 +97,13 @@ export default function AdminContentTab() {
             className="w-full border border-[#E5EFE8] rounded-md p-2 text-sm"
           />
         </Field>
-        <Field label="Hero image URL">
-          <Input value={content.landing.hero.image_url} onChange={(e) => updateHero("image_url", e.target.value)} placeholder="https://..." />
-          {content.landing.hero.image_url && (
-            <img src={content.landing.hero.image_url} alt="" className="mt-2 w-full h-40 object-cover rounded-lg border border-[#E5EFE8]" />
-          )}
+        <Field label="Hero image">
+          <ImageUploader
+            value={content.landing.hero.image_url}
+            onChange={(v) => updateHero("image_url", v)}
+            height="h-48"
+            testId="hero-image"
+          />
         </Field>
         <div className="grid md:grid-cols-2 gap-4">
           <Field label="Subscribe CTA"><Input value={content.landing.hero.subscribe_cta} onChange={(e) => updateHero("subscribe_cta", e.target.value)} /></Field>
@@ -224,15 +227,22 @@ function ExtrasEditor({ extras, onChange }) {
             <Label className="text-xs uppercase tracking-wider text-[#5C7063]">Title</Label>
             <Input value={e.title || ""} onChange={(ev) => { const arr = [...extras]; arr[i] = { ...arr[i], title: ev.target.value }; onChange(arr); }} className="mt-1" />
           </div>
-          <div className="md:col-span-4">
+          <div className="md:col-span-3">
             <Label className="text-xs uppercase tracking-wider text-[#5C7063]">Caption</Label>
             <Input value={e.caption || ""} onChange={(ev) => { const arr = [...extras]; arr[i] = { ...arr[i], caption: ev.target.value }; onChange(arr); }} className="mt-1" />
           </div>
-          <div className="md:col-span-4">
-            <Label className="text-xs uppercase tracking-wider text-[#5C7063]">Image URL</Label>
-            <Input value={e.image_url || ""} onChange={(ev) => { const arr = [...extras]; arr[i] = { ...arr[i], image_url: ev.target.value }; onChange(arr); }} className="mt-1" />
+          <div className="md:col-span-5">
+            <Label className="text-xs uppercase tracking-wider text-[#5C7063]">Image</Label>
+            <div className="mt-1">
+              <ImageUploader
+                value={e.image_url || ""}
+                onChange={(v) => { const arr = [...extras]; arr[i] = { ...arr[i], image_url: v }; onChange(arr); }}
+                height="h-32"
+                testId={`extras-image-${i}`}
+              />
+            </div>
           </div>
-          <div className="md:col-span-1 flex items-end">
+          <div className="md:col-span-1 flex items-start pt-6">
             <Button size="sm" variant="ghost" onClick={() => onChange(extras.filter((_, idx) => idx !== i))}>
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
