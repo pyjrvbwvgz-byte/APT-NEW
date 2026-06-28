@@ -29,6 +29,7 @@ from stripe_service import (
     retrieve_session_customer,
     STRIPE_PAYMENT_LINK,
 )
+from site_content_defaults import SITE_CONTENT_DEFAULTS, deep_merge
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -555,19 +556,31 @@ async def get_recipe(slug: str):
 
 async def get_or_create_client_menu(client_id: str) -> dict:
     """Returns the client's personalised weekly menu, generating it if missing.
-    Avoids repeating recipes from last week."""
+    If admin has saved a menu template, use that. Otherwise randomise from the recipe pool."""
     ws_iso = week_start().date().isoformat()
     existing = await db.client_menus.find_one({"client_id": client_id, "week_start": ws_iso}, {"_id": 0})
     if existing:
         return existing
-    # Build recipe pool grouped by category
+    # Prefer the admin-saved menu for this week (so admin's "Save menu" applies automatically)
+    admin_menu = await db.menus.find_one({"week_start": ws_iso}, {"_id": 0})
+    if admin_menu and admin_menu.get("days"):
+        days = admin_menu["days"]
+        menu = {
+            "client_id": client_id,
+            "week_start": ws_iso,
+            "days": days,
+            "created_at": now_utc().isoformat(),
+            "source": "admin",
+        }
+        await db.client_menus.insert_one(menu.copy())
+        return menu
+    # Otherwise randomise per-client
     recipes = await db.recipes.find({}, {"_id": 0}).to_list(500)
     by_cat: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": []}
     for r in recipes:
         cat = r.get("category", "lunch")
         if cat in by_cat:
             by_cat[cat].append(r["slug"])
-    # Pull last week's plan (if any) so we can avoid repeats
     last = await db.client_menus.find_one(
         {"client_id": client_id, "week_start": {"$lt": ws_iso}},
         sort=[("week_start", -1)],
@@ -582,15 +595,12 @@ async def get_or_create_client_menu(client_id: str) -> dict:
                     last_slugs_per_meal[meal].add(s)
     days = {}
     rng = random.Random(f"{client_id}:{ws_iso}")
-    # For each meal, generate a shuffled list per client/week so the same client gets a stable plan
     for meal in ("breakfast", "lunch", "dinner"):
         pool = list(by_cat.get(meal, []))
-        # Prefer recipes not in last week's plan
         fresh = [s for s in pool if s not in last_slugs_per_meal[meal]]
         if len(fresh) >= 7:
             pool = fresh
         rng.shuffle(pool)
-        # Cycle through pool so each day gets a distinct recipe (when pool >= 7)
         for i, day in enumerate(DAY_KEYS):
             slug = pool[i % len(pool)] if pool else None
             days.setdefault(day, {})[meal] = slug
@@ -599,6 +609,7 @@ async def get_or_create_client_menu(client_id: str) -> dict:
         "week_start": ws_iso,
         "days": days,
         "created_at": now_utc().isoformat(),
+        "source": "random",
     }
     await db.client_menus.insert_one(menu.copy())
     return menu
@@ -743,8 +754,79 @@ async def admin_rotate_all(_: bool = Depends(require_admin)):
     rotated = await maybe_rotate_codes(force=True)
     return {"rotated": rotated or []}
 
+@api_router.get("/site")
+async def get_site_content():
+    """Public — returns merged site content (defaults + admin overrides)."""
+    doc = await db.site_content.find_one({"key": "main"}, {"_id": 0})
+    override = (doc or {}).get("content", {})
+    return deep_merge(SITE_CONTENT_DEFAULTS, override)
+
+@api_router.put("/admin/site")
+async def update_site_content(payload: dict, _: bool = Depends(require_admin)):
+    """Admin — replace site content overrides (deep-merged with defaults on read)."""
+    content = payload.get("content") if isinstance(payload, dict) else None
+    if content is None:
+        raise HTTPException(status_code=400, detail="Missing 'content' object")
+    await db.site_content.update_one(
+        {"key": "main"},
+        {"$set": {"key": "main", "content": content, "updated_at": now_utc().isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+class RecipeUpdateIn(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    prep_time: Optional[int] = None
+    servings: Optional[int] = None
+    ingredients: Optional[List[dict]] = None
+    instructions: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    macros: Optional[dict] = None
+
+@api_router.put("/admin/recipes/{slug}")
+async def admin_update_recipe(slug: str, payload: RecipeUpdateIn, _: bool = Depends(require_admin)):
+    existing = await db.recipes.find_one({"slug": slug}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    update = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    if update:
+        await db.recipes.update_one({"slug": slug}, {"$set": update})
+    return await db.recipes.find_one({"slug": slug}, {"_id": 0})
+
+class RecipeCreateIn(BaseModel):
+    slug: str
+    name: str
+    category: str
+    image_url: str = ""
+    prep_time: int = 15
+    servings: int = 1
+    ingredients: List[dict] = []
+    instructions: List[str] = []
+    tags: List[str] = []
+    macros: dict = {"kcal": 0, "protein": 0, "carbs": 0, "fat": 0}
+
+@api_router.post("/admin/recipes")
+async def admin_create_recipe(payload: RecipeCreateIn, _: bool = Depends(require_admin)):
+    existing = await db.recipes.find_one({"slug": payload.slug}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="A recipe with this slug already exists")
+    doc = payload.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    await db.recipes.insert_one(doc)
+    return doc
+
+@api_router.delete("/admin/recipes/{slug}")
+async def admin_delete_recipe(slug: str, _: bool = Depends(require_admin)):
+    res = await db.recipes.delete_one({"slug": slug})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return {"ok": True}
+
 class MenuUpdateIn(BaseModel):
     days: Dict[str, Dict[str, str]]
+    apply_to_all: bool = True
 
 @api_router.put("/admin/menu/current")
 async def admin_update_menu(payload: MenuUpdateIn, _: bool = Depends(require_admin)):
@@ -754,7 +836,32 @@ async def admin_update_menu(payload: MenuUpdateIn, _: bool = Depends(require_adm
         {"$set": {"days": payload.days, "updated_at": now_utc().isoformat()}},
         upsert=True,
     )
-    return {"ok": True, "week_start": ws, "days": payload.days}
+    # Also persist as the canonical template for future weeks
+    await db.system.update_one(
+        {"key": "menu_template"},
+        {"$set": {"days": payload.days, "updated_at": now_utc().isoformat()}},
+        upsert=True,
+    )
+    applied = 0
+    if payload.apply_to_all:
+        # Push the saved menu to every existing client_menus for this week,
+        # AND seed it for every active client who doesn't yet have one.
+        await db.client_menus.update_many(
+            {"week_start": ws},
+            {"$set": {"days": payload.days, "updated_at": now_utc().isoformat()}},
+        )
+        clients = await db.clients.find({"active": True}, {"_id": 0, "id": 1}).to_list(2000)
+        for c in clients:
+            existing = await db.client_menus.find_one({"client_id": c["id"], "week_start": ws}, {"_id": 0})
+            if not existing:
+                await db.client_menus.insert_one({
+                    "client_id": c["id"],
+                    "week_start": ws,
+                    "days": payload.days,
+                    "created_at": now_utc().isoformat(),
+                })
+            applied += 1
+    return {"ok": True, "week_start": ws, "days": payload.days, "applied_to_clients": applied}
 
 @api_router.get("/admin/menu/current")
 async def admin_get_menu(_: bool = Depends(require_admin)):
