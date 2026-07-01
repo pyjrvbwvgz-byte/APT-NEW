@@ -9,6 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { generateMealPlanPDF } from "../lib/pdf";
 import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet, CreditCard, Shuffle } from "lucide-react";
 import ProfileIntakeModal from "../components/ProfileIntakeModal";
+import ProgressLog from "../components/ProgressLog";
 
 const DAY_LABELS = {
   Mon: "Monday",
@@ -373,6 +374,17 @@ export default function DashboardPage() {
               </div>
             )}
           </section>
+
+          {/* PROGRESS LOG */}
+          {client?.profile_completed_at && (
+            <ProgressLog
+              client={client}
+              onWeightChange={(updated) => {
+                setClientFromExternal(updated);
+                loadAll();
+              }}
+            />
+          )}
 
           {/* SHOPPING LIST */}
           <section>

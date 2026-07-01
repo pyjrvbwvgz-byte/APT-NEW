@@ -345,6 +345,54 @@ async def update_profile(payload: ProfileIn, client_in: dict = Depends(get_curre
 
 ACTIVITY_ALLOWED = {"sedentary", "light", "moderate", "active", "very_active"}
 
+# ---------- weigh-ins / progress ----------
+class WeighInIn(BaseModel):
+    weight_kg: float = Field(ge=30, le=300)
+    date: Optional[str] = None  # ISO date; defaults to today (UTC)
+    note: Optional[str] = None
+
+@api_router.get("/client/weigh-ins")
+async def list_weigh_ins(client_in: dict = Depends(get_current_client)):
+    entries = await db.weigh_ins.find(
+        {"client_id": client_in["id"]}, {"_id": 0}
+    ).sort("date", 1).to_list(500)
+    return {"entries": entries}
+
+@api_router.post("/client/weigh-ins")
+async def create_weigh_in(payload: WeighInIn, client_in: dict = Depends(get_current_client)):
+    date = payload.date or now_utc().date().isoformat()
+    entry = {
+        "id": str(uuid.uuid4()),
+        "client_id": client_in["id"],
+        "weight_kg": round(float(payload.weight_kg), 2),
+        "date": date,
+        "note": (payload.note or "").strip() or None,
+        "created_at": now_utc().isoformat(),
+    }
+    # If a log already exists for this date, overwrite it (idempotent daily logging)
+    await db.weigh_ins.update_one(
+        {"client_id": client_in["id"], "date": date},
+        {"$set": entry},
+        upsert=True,
+    )
+    # Update the client's current weight in their profile so targets auto-recalc
+    profile = client_in.get("profile") or {}
+    if profile:
+        profile["weight_kg"] = entry["weight_kg"]
+        profile["updated_at"] = now_utc().isoformat()
+        await db.clients.update_one(
+            {"id": client_in["id"]},
+            {"$set": {"profile": profile}},
+        )
+    return {"entry": entry, "targets": compute_targets(profile) if profile else None}
+
+@api_router.delete("/client/weigh-ins/{entry_id}")
+async def delete_weigh_in(entry_id: str, client_in: dict = Depends(get_current_client)):
+    res = await db.weigh_ins.delete_one({"id": entry_id, "client_id": client_in["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
 # ---------- payments ----------
 @api_router.post("/payments/checkout")
 async def create_checkout(payload: CheckoutIn, request: Request):
