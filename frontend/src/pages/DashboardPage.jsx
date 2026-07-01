@@ -8,6 +8,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { generateMealPlanPDF } from "../lib/pdf";
 import { FileDown, LogOut, Clock, ChefHat, ShoppingBasket, Flame, Beef, Wheat, Droplet, CreditCard, Shuffle } from "lucide-react";
+import ProfileIntakeModal from "../components/ProfileIntakeModal";
 
 const DAY_LABELS = {
   Mon: "Monday",
@@ -29,7 +30,7 @@ function daysUntil(iso) {
 }
 
 export default function DashboardPage() {
-  const { client, logout } = useAuth();
+  const { client, logout, setClientFromExternal } = useAuth();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(null);
   const [shopping, setShopping] = useState(null);
@@ -69,21 +70,23 @@ export default function DashboardPage() {
     }
   };
 
-  // Compute daily and weekly macros
-  const { dailyTotals, weeklyTotals } = useMemo(() => {
-    if (!menu) return { dailyTotals: {}, weeklyTotals: { kcal: 0, protein: 0, carbs: 0, fat: 0 } };
+  // Compute daily and weekly macros (respecting per-day scale from targets)
+  const { dailyTotals, weeklyTotals, dayScales, targets } = useMemo(() => {
+    if (!menu) return { dailyTotals: {}, weeklyTotals: { kcal: 0, protein: 0, carbs: 0, fat: 0 }, dayScales: {}, targets: null };
     const daily = {};
     const weekly = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    const scales = menu.day_scales || {};
     DAYS.forEach((d) => {
+      const scale = scales[d] || 1;
       const day = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
       ["breakfast", "lunch", "dinner"].forEach((meal) => {
         const slug = menu.days?.[d]?.[meal];
         const r = slug && menu.recipes?.[slug];
         if (r?.macros) {
-          day.kcal += r.macros.kcal || 0;
-          day.protein += r.macros.protein || 0;
-          day.carbs += r.macros.carbs || 0;
-          day.fat += r.macros.fat || 0;
+          day.kcal += Math.round((r.macros.kcal || 0) * scale);
+          day.protein += Math.round((r.macros.protein || 0) * scale);
+          day.carbs += Math.round((r.macros.carbs || 0) * scale);
+          day.fat += Math.round((r.macros.fat || 0) * scale);
         }
       });
       daily[d] = day;
@@ -92,11 +95,19 @@ export default function DashboardPage() {
       weekly.carbs += day.carbs;
       weekly.fat += day.fat;
     });
-    return { dailyTotals: daily, weeklyTotals: weekly };
+    return { dailyTotals: daily, weeklyTotals: weekly, dayScales: scales, targets: menu.targets };
   }, [menu]);
+
+  const needsProfile = !client?.profile_completed_at;
 
   return (
     <div className="min-h-screen flex flex-col">
+      {needsProfile && (
+        <ProfileIntakeModal
+          client={client}
+          onSaved={(updated) => setClientFromExternal(updated)}
+        />
+      )}
       <Header
         right={
           <>
@@ -207,6 +218,31 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* DAILY TARGETS */}
+          {targets && (
+            <section className="mb-6">
+              <div className="rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white p-5 lg:p-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] opacity-80">
+                    Your daily targets
+                  </div>
+                  <div className="font-display text-2xl lg:text-3xl font-bold mt-1 tracking-tight">
+                    {targets.kcal.toLocaleString()} kcal / day
+                  </div>
+                  <div className="text-sm opacity-90 mt-1">
+                    {targets.protein_g}g protein · {targets.carbs_g}g carbs · {targets.fat_g}g fat
+                    <span className="opacity-70"> · TDEE {targets.tdee}</span>
+                  </div>
+                </div>
+                <div className="text-xs opacity-90 max-w-sm">
+                  Your weekly meals are scaled to hit this target. Check each day's
+                  <span className="font-mono bg-white/10 px-1.5 py-0.5 rounded mx-1">×n</span>
+                  badge to see the portion multiplier.
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* WEEKLY MACROS */}
           <section className="mb-12">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -271,6 +307,14 @@ export default function DashboardPage() {
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.2em] text-[#5C7063]">
                           Day {di + 1}
+                          {dayScales[day] && dayScales[day] !== 1 && (
+                            <span
+                              className="ml-2 font-mono text-[#059669] bg-[#10B981]/10 px-1.5 py-0.5 rounded"
+                              data-testid={`day-scale-${day}`}
+                            >
+                              ×{dayScales[day]}
+                            </span>
+                          )}
                         </div>
                         <div className="font-display font-semibold text-[#111C15]">
                           {DAY_LABELS[day]}
@@ -282,6 +326,11 @@ export default function DashboardPage() {
                         </div>
                         <div className="font-display font-bold text-[#10B981] tabular-nums">
                           {dailyTotals[day]?.kcal?.toLocaleString() || "—"}
+                          {targets && (
+                            <span className="text-[10px] text-[#5C7063] font-normal ml-1">
+                              /{targets.kcal.toLocaleString()}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

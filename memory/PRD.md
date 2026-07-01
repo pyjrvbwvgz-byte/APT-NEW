@@ -1,25 +1,30 @@
 # APT — Meal Prep Platform
 
 ## Original Problem
-Professional meal prep website with weekly menus, client profiles, PDF download, shopping lists, with all listed foods (breakfast bagel, chicken stir-fry, burrito bowl, Irish beef burger, etc.).
+Professional meal prep website with weekly menus, client profiles, PDF download, shopping lists, dual auth (code + Stripe), and personalized calorie/macro targets.
 
 ## Current Status
-- Dual auth: weekly 4-digit code + Stripe €14.99/mo subscription
+- Dual auth: 4-digit weekly code + €14.99/mo Stripe subscription
 - 35 recipes, per-client randomized weekly menus
-- PDF download (jsPDF) + auto shopping list
-- Resend emails for code digests
-- Admin CMS with 4 tabs: Clients, Weekly menu, Meals, Website content
-- "Save & apply to all clients" pushes menu to every active client (verified 10 clients updated)
-- Dynamic landing page content via /api/site
-- Stripe webhooks + customer portal
+- PDF meal plan + auto shopping list
+- Resend email digests to admin
+- Admin CMS: Clients / Weekly menu / Meals / Website (4 tabs, image uploads working)
+- Emergent Object Storage — image upload for meals + website
+- **NEW: Personalized nutrition** — Mifflin-St Jeor BMR, per-day meal portion scaling, mandatory intake modal on first dashboard visit
 
-## Implemented (this session)
-- 2026-02-28: Fixed broken AdminPage.jsx (stripped 200 lines of orphaned JSX)
-- Tabs: Clients / Weekly menu / Meals / Website all rendering
-- Backend menu save apply_to_all verified working (10 clients pushed)
-- Landing page reads live content from /api/site
+## Implemented (recent)
+- 2026-02-28: Fixed AdminPage.jsx broken refactor; 4 tabs live
+- 2026-02-28: Emergent Object Storage image uploads (meals + website hero/extras)
+- 2026-07-01: Client profile intake (sex/age/height/weight/activity/goal) → Mifflin-St Jeor calc → daily kcal + macros → per-day scale factor applied to meals and shopping list
+
+## Architecture
+- Backend: /app/backend/nutrition.py (compute_targets + day_scale_factor), server.py (/client/profile GET/PUT, /menu/current & /menu/shopping-list now return targets + day_scales)
+- Frontend: /app/frontend/src/components/ProfileIntakeModal.jsx (mandatory), DashboardPage.jsx (targets banner + ×n scale badge per day)
 
 ## P0/P1 Backlog
-- P1: Theme color picker in Website tab (let admin change primary green)
-- P1: Per-client menu override editor (currently uniform pushes only)
-- P2: Image upload to object storage instead of URL paste
+- P1: Reflect scale factor on individual meal cards in Dashboard/RecipePage (show scaled kcal/macros)
+- P1: Reflect scaled ingredients on RecipePage
+- P1: Include daily targets on the PDF
+- P1: Admin — view/edit each client's profile
+- P1: Theme color picker in Website tab
+- P2: "Pick from existing uploads" image gallery

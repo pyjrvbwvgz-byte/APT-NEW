@@ -32,6 +32,7 @@ from stripe_service import (
 )
 from site_content_defaults import SITE_CONTENT_DEFAULTS, deep_merge
 from storage_service import init_storage, put_object, get_object
+from nutrition import compute_targets, day_scale_factor
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -211,6 +212,7 @@ async def require_admin(authorization: Optional[str] = Header(None)):
     return True
 
 def client_public(c: dict) -> dict:
+    profile = c.get("profile")
     return {
         "id": c["id"],
         "name": c["name"],
@@ -220,6 +222,9 @@ def client_public(c: dict) -> dict:
         "subscription_expires_at": c.get("subscription_expires_at"),
         "is_subscribed": has_active_subscription(c),
         "created_at": c["created_at"],
+        "profile": profile,
+        "profile_completed_at": c.get("profile_completed_at"),
+        "targets": compute_targets(profile),
     }
 
 def make_token(c: dict) -> str:
@@ -299,6 +304,46 @@ async def login(payload: LoginIn):
 @api_router.get("/auth/me")
 async def me(client_in: dict = Depends(get_current_client)):
     return client_public(client_in)
+
+# ---------- client profile / macros ----------
+class ProfileIn(BaseModel):
+    sex: str  # "male" or "female"
+    age: int = Field(ge=10, le=100)
+    height_cm: float = Field(ge=100, le=250)
+    weight_kg: float = Field(ge=30, le=300)
+    activity_level: str  # sedentary | light | moderate | active | very_active
+    goal: str  # lose | maintain | gain
+
+@api_router.get("/client/profile")
+async def get_profile(client_in: dict = Depends(get_current_client)):
+    profile = client_in.get("profile")
+    return {"profile": profile, "targets": compute_targets(profile)}
+
+@api_router.put("/client/profile")
+async def update_profile(payload: ProfileIn, client_in: dict = Depends(get_current_client)):
+    sex = payload.sex.lower()
+    if sex not in ("male", "female"):
+        raise HTTPException(status_code=400, detail="sex must be 'male' or 'female'")
+    if payload.activity_level not in ACTIVITY_ALLOWED:
+        raise HTTPException(status_code=400, detail="Invalid activity_level")
+    if payload.goal not in ("lose", "maintain", "gain"):
+        raise HTTPException(status_code=400, detail="Invalid goal")
+    profile = {
+        "sex": sex,
+        "age": payload.age,
+        "height_cm": payload.height_cm,
+        "weight_kg": payload.weight_kg,
+        "activity_level": payload.activity_level,
+        "goal": payload.goal,
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.clients.update_one(
+        {"id": client_in["id"]},
+        {"$set": {"profile": profile, "profile_completed_at": now_utc().isoformat()}},
+    )
+    return {"profile": profile, "targets": compute_targets(profile)}
+
+ACTIVITY_ALLOWED = {"sedentary", "light", "moderate", "active", "very_active"}
 
 # ---------- payments ----------
 @api_router.post("/payments/checkout")
@@ -632,30 +677,46 @@ async def current_menu(client_in: dict = Depends(get_current_client)):
                 slugs.add(s)
     recipes_list = await db.recipes.find({"slug": {"$in": list(slugs)}}, {"_id": 0}).to_list(200)
     recipes_map = {r["slug"]: r for r in recipes_list}
-    return {"week_start": menu["week_start"], "days": menu["days"], "recipes": recipes_map}
+
+    targets = compute_targets(client_in.get("profile"))
+    day_scales: Dict[str, float] = {}
+    if targets:
+        for day, meals in menu["days"].items():
+            day_recipes = [recipes_map.get(s) for s in meals.values() if s]
+            day_scales[day] = day_scale_factor(targets, day_recipes)
+
+    return {
+        "week_start": menu["week_start"],
+        "days": menu["days"],
+        "recipes": recipes_map,
+        "targets": targets,
+        "day_scales": day_scales,
+    }
 
 @api_router.get("/menu/shopping-list")
 async def shopping_list(client_in: dict = Depends(get_current_client)):
     menu = await get_or_create_client_menu(client_in["id"])
-    slugs = []
-    for day, meals in menu["days"].items():
-        for s in meals.values():
-            if s:
-                slugs.append(s)
-    recipes_list = await db.recipes.find({"slug": {"$in": slugs}}, {"_id": 0}).to_list(200)
+    recipes_list = await db.recipes.find({}, {"_id": 0}).to_list(500)
     recipes_map = {r["slug"]: r for r in recipes_list}
+
+    targets = compute_targets(client_in.get("profile"))
     agg: Dict[str, Dict] = {}
-    for slug in slugs:
-        r = recipes_map.get(slug)
-        if not r:
-            continue
-        for ingred in r["ingredients"]:
-            key = f"{ingred['name'].lower()}|{ingred['unit'].lower()}"
-            if key not in agg:
-                agg[key] = {"name": ingred["name"], "unit": ingred["unit"], "quantity": 0.0}
-            agg[key]["quantity"] += float(ingred["quantity"])
+    for day, meals in menu["days"].items():
+        day_recipes = [recipes_map.get(s) for s in meals.values() if s]
+        scale = day_scale_factor(targets, day_recipes) if targets else 1.0
+        for r in day_recipes:
+            if not r:
+                continue
+            for ingred in r["ingredients"]:
+                key = f"{ingred['name'].lower()}|{ingred['unit'].lower()}"
+                if key not in agg:
+                    agg[key] = {"name": ingred["name"], "unit": ingred["unit"], "quantity": 0.0}
+                agg[key]["quantity"] += float(ingred["quantity"]) * scale
+    # Round quantities to 1 decimal
+    for v in agg.values():
+        v["quantity"] = round(v["quantity"], 1)
     items = sorted(agg.values(), key=lambda x: x["name"].lower())
-    return {"week_start": menu["week_start"], "items": items}
+    return {"week_start": menu["week_start"], "items": items, "targets": targets}
 
 @api_router.post("/menu/reshuffle")
 async def reshuffle_menu(client_in: dict = Depends(get_current_client)):
