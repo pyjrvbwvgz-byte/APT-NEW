@@ -23,9 +23,10 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCard, Users, Calendar, Salad, Layout } from "lucide-react";
+import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCard, Users, Calendar, Salad, Layout, Utensils } from "lucide-react";
 import AdminMealsTab from "./admin/AdminMealsTab";
 import AdminContentTab from "./admin/AdminContentTab";
+import ClientMenuEditor from "./admin/ClientMenuEditor";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -338,8 +339,15 @@ function AdminDashboard({ onLogout }) {
 }
 
 function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNewEmail, creating, createClient, regenCode, removeClient }) {
+  const [menuEditFor, setMenuEditFor] = useState(null);
   return (
     <>
+      {menuEditFor && (
+        <ClientMenuEditor
+          client={menuEditFor}
+          onClose={() => setMenuEditFor(null)}
+        />
+      )}
           {/* Create coaching client */}
           <section>
             <h2 className="font-display text-2xl font-semibold text-[#111C15] mb-4">
@@ -445,6 +453,15 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
                             : "—"}
                         </TableCell>
                         <TableCell className="text-right space-x-2 whitespace-nowrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMenuEditFor(c)}
+                            className="border-[#10B981]/40 text-[#059669] hover:bg-[#10B981]/5"
+                            data-testid={`meals-${c.id}`}
+                          >
+                            <Utensils className="w-3.5 h-3.5 mr-1" /> Meals
+                          </Button>
                           {!c.is_subscribed && (
                             <Button
                               variant="outline"

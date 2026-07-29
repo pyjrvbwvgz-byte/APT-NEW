@@ -869,6 +869,48 @@ async def admin_rotate_all(_: bool = Depends(require_admin)):
     rotated = await maybe_rotate_codes(force=True)
     return {"rotated": rotated or []}
 
+# ---------- per-client menu ----------
+@api_router.get("/admin/clients/{client_id}/menu")
+async def admin_get_client_menu(client_id: str, _: bool = Depends(require_admin)):
+    """Return the client's current-week menu. Creates one if missing (same logic as client dashboard)."""
+    c = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    menu = await get_or_create_client_menu(client_id)
+    return {
+        "client": {"id": c["id"], "name": c["name"], "email": c["email"]},
+        "week_start": menu["week_start"],
+        "days": menu["days"],
+    }
+
+class ClientMenuUpdateIn(BaseModel):
+    days: Dict[str, Dict[str, str]]
+
+@api_router.put("/admin/clients/{client_id}/menu")
+async def admin_update_client_menu(
+    client_id: str,
+    payload: ClientMenuUpdateIn,
+    _: bool = Depends(require_admin),
+):
+    """Overwrite ONLY this client's menu for the current week — does not affect other clients."""
+    c = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    ws_iso = week_start().date().isoformat()
+    await db.client_menus.update_one(
+        {"client_id": client_id, "week_start": ws_iso},
+        {"$set": {
+            "client_id": client_id,
+            "week_start": ws_iso,
+            "days": payload.days,
+            "updated_at": now_utc().isoformat(),
+            "manually_edited": True,
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "client_id": client_id, "week_start": ws_iso, "days": payload.days}
+
+
 @api_router.get("/site")
 async def get_site_content():
     """Public — returns merged site content (defaults + admin overrides)."""
