@@ -23,10 +23,11 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCard, Users, Calendar, Salad, Layout, Utensils } from "lucide-react";
+import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCard, Users, Calendar, Salad, Layout, Utensils, User } from "lucide-react";
 import AdminMealsTab from "./admin/AdminMealsTab";
 import AdminContentTab from "./admin/AdminContentTab";
 import ClientMenuEditor from "./admin/ClientMenuEditor";
+import ClientProfileView from "./admin/ClientProfileView";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -340,12 +341,19 @@ function AdminDashboard({ onLogout }) {
 
 function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNewEmail, creating, createClient, regenCode, removeClient }) {
   const [menuEditFor, setMenuEditFor] = useState(null);
+  const [profileFor, setProfileFor] = useState(null);
   return (
     <>
       {menuEditFor && (
         <ClientMenuEditor
           client={menuEditFor}
           onClose={() => setMenuEditFor(null)}
+        />
+      )}
+      {profileFor && (
+        <ClientProfileView
+          client={profileFor}
+          onClose={() => setProfileFor(null)}
         />
       )}
           {/* Create coaching client */}
@@ -453,6 +461,15 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
                             : "—"}
                         </TableCell>
                         <TableCell className="text-right space-x-2 whitespace-nowrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setProfileFor(c)}
+                            className="border-[#E5EFE8]"
+                            data-testid={`profile-${c.id}`}
+                          >
+                            <User className="w-3.5 h-3.5 mr-1" /> Profile
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

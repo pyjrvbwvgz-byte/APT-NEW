@@ -910,6 +910,32 @@ async def admin_update_client_menu(
     )
     return {"ok": True, "client_id": client_id, "week_start": ws_iso, "days": payload.days}
 
+@api_router.get("/admin/clients/{client_id}/profile")
+async def admin_get_client_profile(client_id: str, _: bool = Depends(require_admin)):
+    """Admin — full client profile, computed targets, and weigh-in history."""
+    c = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Client not found")
+    profile = c.get("profile")
+    weigh_ins = await db.weigh_ins.find(
+        {"client_id": client_id}, {"_id": 0}
+    ).sort("date", 1).to_list(500)
+    return {
+        "client": {
+            "id": c["id"],
+            "name": c["name"],
+            "email": c["email"],
+            "is_subscribed": has_active_subscription(c),
+            "code": c.get("code"),
+            "code_expires_at": c.get("code_expires_at"),
+            "created_at": c["created_at"],
+        },
+        "profile": profile,
+        "profile_completed_at": c.get("profile_completed_at"),
+        "targets": compute_targets(profile),
+        "weigh_ins": weigh_ins,
+    }
+
 
 @api_router.get("/site")
 async def get_site_content():
