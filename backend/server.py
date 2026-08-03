@@ -18,6 +18,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 from recipes_seed import RECIPES_SEED, WEEKLY_TEMPLATE
+from recipes_extra_seed import EXTRA_RECIPES
 from email_service import send_code_email, send_admin_digest
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout,
@@ -114,6 +115,17 @@ class CheckoutIn(BaseModel):
     email: EmailStr
     origin_url: str
 
+def _goal_tag_for(recipe: dict) -> str:
+    """Auto-tag legacy recipes by macros so goal-based menu picking works uniformly."""
+    kcal = (recipe.get("macros") or {}).get("kcal", 0)
+    protein = (recipe.get("macros") or {}).get("protein", 0)
+    protein_density = protein / kcal if kcal else 0
+    if kcal <= 450 and protein_density >= 0.06:
+        return "lean"
+    if kcal >= 600 and protein >= 25:
+        return "bulk"
+    return "balanced"
+
 # ---------- startup ----------
 @app.on_event("startup")
 async def startup_seed():
@@ -121,8 +133,21 @@ async def startup_seed():
         init_storage()
     except Exception as e:
         logging.getLogger(__name__).warning("storage init failed at startup: %s", e)
+    # Seed core recipes + auto-attach a goal tag when missing
     for r in RECIPES_SEED:
-        await db.recipes.update_one({"slug": r["slug"]}, {"$set": r}, upsert=True)
+        auto_tag = _goal_tag_for(r)
+        tags = list(r.get("tags") or [])
+        if not any(t in tags for t in ("lean", "bulk", "balanced")):
+            tags.append(auto_tag)
+        payload = {**r, "tags": tags}
+        await db.recipes.update_one({"slug": r["slug"]}, {"$set": payload}, upsert=True)
+    # Seed 48 extra easy recipes (each ships with a lean/bulk/balanced tag already)
+    for r in EXTRA_RECIPES:
+        # only upsert if slug doesn't already exist to respect admin edits
+        existing = await db.recipes.find_one({"slug": r["slug"]}, {"_id": 0})
+        if existing:
+            continue
+        await db.recipes.insert_one({**r})
     ws = week_start().date().isoformat()
     existing = await db.menus.find_one({"week_start": ws}, {"_id": 0})
     if not existing:
@@ -341,6 +366,17 @@ async def update_profile(payload: ProfileIn, client_in: dict = Depends(get_curre
         {"id": client_in["id"]},
         {"$set": {"profile": profile, "profile_completed_at": now_utc().isoformat()}},
     )
+    # If the goal or key stats changed, drop this week's cached menu so it
+    # re-generates against the new goal (admin-saved menus keep priority).
+    prev_goal = ((client_in.get("profile") or {}).get("goal"))
+    if prev_goal != profile["goal"]:
+        ws_iso = week_start().date().isoformat()
+        # Only clear auto-generated menus, not admin overrides / manual edits
+        await db.client_menus.delete_many({
+            "client_id": client_in["id"],
+            "week_start": ws_iso,
+            "source": {"$regex": "^random"},
+        })
     return {"profile": profile, "targets": compute_targets(profile)}
 
 ACTIVITY_ALLOWED = {"sedentary", "light", "moderate", "active", "very_active"}
@@ -655,7 +691,8 @@ async def get_recipe(slug: str):
 
 async def get_or_create_client_menu(client_id: str) -> dict:
     """Returns the client's personalised weekly menu, generating it if missing.
-    If admin has saved a menu template, use that. Otherwise randomise from the recipe pool."""
+    If admin has saved a menu template, use that. Otherwise randomise from the recipe pool
+    filtered to match the client's goal (lose → lean, gain → bulk, maintain → balanced)."""
     ws_iso = week_start().date().isoformat()
     existing = await db.client_menus.find_one({"client_id": client_id, "week_start": ws_iso}, {"_id": 0})
     if existing:
@@ -673,12 +710,27 @@ async def get_or_create_client_menu(client_id: str) -> dict:
         }
         await db.client_menus.insert_one(menu.copy())
         return menu
-    # Otherwise randomise per-client
+    # Otherwise randomise per-client with goal-aware filtering
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0}) or {}
+    goal = ((client.get("profile") or {}).get("goal")) or "maintain"
+    # Preferred tags per goal — always include "balanced" as a safety net
+    if goal == "lose":
+        preferred = {"lean", "balanced"}
+    elif goal == "gain":
+        preferred = {"bulk", "balanced"}
+    else:
+        preferred = {"balanced", "lean", "bulk"}
+
     recipes = await db.recipes.find({}, {"_id": 0}).to_list(500)
     by_cat: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": []}
+    by_cat_all: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": []}
     for r in recipes:
         cat = r.get("category", "lunch")
-        if cat in by_cat:
+        if cat not in by_cat:
+            continue
+        by_cat_all[cat].append(r["slug"])
+        tags = set(r.get("tags") or [])
+        if tags & preferred:
             by_cat[cat].append(r["slug"])
     last = await db.client_menus.find_one(
         {"client_id": client_id, "week_start": {"$lt": ws_iso}},
@@ -693,9 +745,12 @@ async def get_or_create_client_menu(client_id: str) -> dict:
                 if s:
                     last_slugs_per_meal[meal].add(s)
     days = {}
-    rng = random.Random(f"{client_id}:{ws_iso}")
+    rng = random.Random(f"{client_id}:{ws_iso}:{goal}")
     for meal in ("breakfast", "lunch", "dinner"):
+        # Prefer goal-tagged pool; fall back to all recipes if we somehow lack coverage
         pool = list(by_cat.get(meal, []))
+        if len(pool) < 7:
+            pool = list(by_cat_all.get(meal, []))
         fresh = [s for s in pool if s not in last_slugs_per_meal[meal]]
         if len(fresh) >= 7:
             pool = fresh
@@ -708,7 +763,7 @@ async def get_or_create_client_menu(client_id: str) -> dict:
         "week_start": ws_iso,
         "days": days,
         "created_at": now_utc().isoformat(),
-        "source": "random",
+        "source": f"random:{goal}",
     }
     await db.client_menus.insert_one(menu.copy())
     return menu
