@@ -9,8 +9,8 @@ import {
 import { Save, X, Utensils } from "lucide-react";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MEALS = ["breakfast", "lunch", "dinner"];
-const MEAL_LABELS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
+const MEALS = ["breakfast", "lunch", "dinner", "snack"];
+const MEAL_LABELS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack" };
 
 /**
  * Per-client menu editor. Overwrites only THIS client's week — other clients' plans are untouched.

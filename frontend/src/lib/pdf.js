@@ -137,7 +137,7 @@ export function generateMealPlanPDF({ client, menu, shopping, totals, dailyTotal
   const seen = new Set();
   const recipeList = [];
   DAYS.forEach((day) => {
-    ["breakfast", "lunch", "dinner"].forEach((meal) => {
+    ["breakfast", "lunch", "dinner", "snack"].forEach((meal) => {
       const slug = menu.days[day][meal];
       if (slug && !seen.has(slug)) {
         seen.add(slug);

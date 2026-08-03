@@ -19,6 +19,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 from recipes_seed import RECIPES_SEED, WEEKLY_TEMPLATE
 from recipes_extra_seed import EXTRA_RECIPES
+from snacks_seed import SNACKS
 from email_service import send_code_email, send_admin_digest
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout,
@@ -144,6 +145,12 @@ async def startup_seed():
     # Seed 48 extra easy recipes (each ships with a lean/bulk/balanced tag already)
     for r in EXTRA_RECIPES:
         # only upsert if slug doesn't already exist to respect admin edits
+        existing = await db.recipes.find_one({"slug": r["slug"]}, {"_id": 0})
+        if existing:
+            continue
+        await db.recipes.insert_one({**r})
+    # Seed 40 healthy snacks (category="snack")
+    for r in SNACKS:
         existing = await db.recipes.find_one({"slug": r["slug"]}, {"_id": 0})
         if existing:
             continue
@@ -722,8 +729,8 @@ async def get_or_create_client_menu(client_id: str) -> dict:
         preferred = {"balanced", "lean", "bulk"}
 
     recipes = await db.recipes.find({}, {"_id": 0}).to_list(500)
-    by_cat: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": []}
-    by_cat_all: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": []}
+    by_cat: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": [], "snack": []}
+    by_cat_all: Dict[str, List[dict]] = {"breakfast": [], "lunch": [], "dinner": [], "snack": []}
     for r in recipes:
         cat = r.get("category", "lunch")
         if cat not in by_cat:
@@ -737,7 +744,7 @@ async def get_or_create_client_menu(client_id: str) -> dict:
         sort=[("week_start", -1)],
         projection={"_id": 0},
     )
-    last_slugs_per_meal: Dict[str, set] = {"breakfast": set(), "lunch": set(), "dinner": set()}
+    last_slugs_per_meal: Dict[str, set] = {"breakfast": set(), "lunch": set(), "dinner": set(), "snack": set()}
     if last:
         for d in DAY_KEYS:
             for meal in last_slugs_per_meal.keys():
@@ -746,7 +753,7 @@ async def get_or_create_client_menu(client_id: str) -> dict:
                     last_slugs_per_meal[meal].add(s)
     days = {}
     rng = random.Random(f"{client_id}:{ws_iso}:{goal}")
-    for meal in ("breakfast", "lunch", "dinner"):
+    for meal in ("breakfast", "lunch", "dinner", "snack"):
         # Prefer goal-tagged pool; fall back to all recipes if we somehow lack coverage
         pool = list(by_cat.get(meal, []))
         if len(pool) < 7:

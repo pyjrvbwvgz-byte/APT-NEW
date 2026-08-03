@@ -536,6 +536,7 @@ function MenuSection({ menu, recipes, updateMenuSlot, saveMenu, byCategory }) {
                     <th className="text-left p-3 font-medium text-[#5C7063]">Breakfast</th>
                     <th className="text-left p-3 font-medium text-[#5C7063]">Lunch</th>
                     <th className="text-left p-3 font-medium text-[#5C7063]">Dinner</th>
+                    <th className="text-left p-3 font-medium text-[#5C7063]">Snack</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -544,7 +545,7 @@ function MenuSection({ menu, recipes, updateMenuSlot, saveMenu, byCategory }) {
                       <td className="p-3 font-medium font-display text-[#111C15]">
                         {day}
                       </td>
-                      {["breakfast", "lunch", "dinner"].map((meal) => (
+                      {["breakfast", "lunch", "dinner", "snack"].map((meal) => (
                         <td key={meal} className="p-3">
                           <Select
                             value={menu?.days?.[day]?.[meal] || ""}

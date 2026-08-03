@@ -21,7 +21,7 @@ const DAY_LABELS = {
   Sun: "Sunday",
 };
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MEAL_LABELS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
+const MEAL_LABELS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack" };
 
 function daysUntil(iso) {
   const ms = new Date(iso).getTime() - Date.now();
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     DAYS.forEach((d) => {
       const scale = scales[d] || 1;
       const day = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
-      ["breakfast", "lunch", "dinner"].forEach((meal) => {
+      ["breakfast", "lunch", "dinner", "snack"].forEach((meal) => {
         const slug = menu.days?.[d]?.[meal];
         const r = slug && menu.recipes?.[slug];
         if (r?.macros) {
@@ -336,7 +336,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="p-4 flex-1 flex flex-col gap-3">
-                      {["breakfast", "lunch", "dinner"].map((meal) => {
+                      {["breakfast", "lunch", "dinner", "snack"].map((meal) => {
                         const slug = menu?.days?.[day]?.[meal];
                         const recipe = slug && menu?.recipes?.[slug];
                         if (!recipe) return null;

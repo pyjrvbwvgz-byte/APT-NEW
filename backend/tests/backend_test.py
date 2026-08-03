@@ -374,6 +374,150 @@ class TestStripeWebhook:
         assert r.status_code == 400
 
 
+# ---------- Snacks (40 healthy snacks feature) ----------
+class TestSnacks:
+    def test_recipes_contain_40_snacks(self, s):
+        r = s.get(f"{API}/recipes")
+        assert r.status_code == 200
+        items = r.json()
+        snacks = [x for x in items if x.get("category") == "snack"]
+        assert len(snacks) == 40, f"Expected 40 snacks, got {len(snacks)}. Total recipes={len(items)}"
+        # Every snack has one of the goal tags
+        goal_tags = {"lean", "bulk", "balanced"}
+        for sn in snacks:
+            tags = set(sn.get("tags") or [])
+            assert tags & goal_tags, f"Snack {sn.get('slug')} missing goal tag: tags={tags}"
+
+    def test_total_recipes_at_least_123(self, s):
+        r = s.get(f"{API}/recipes")
+        items = r.json()
+        # Feature spec says total ~123 (83 existing + 40 snacks)
+        assert len(items) >= 123, f"Expected >=123 total, got {len(items)}"
+
+    def _login_client(self, s, admin_headers, name, goal):
+        email = f"test_snack_{goal}_{int(time.time()*1000)}@example.com"
+        r = s.post(f"{API}/admin/clients", json={"name": name, "email": email}, headers=admin_headers)
+        assert r.status_code == 200
+        c = r.json()
+        headers = {"Authorization": f"Bearer {c['id']}:{c['code']}", "Content-Type": "application/json"}
+        # Set goal via client profile update
+        prof = {"goal": goal, "sex": "male", "age": 30, "height_cm": 175,
+                "weight_kg": 80, "activity_level": "moderate"}
+        pr = s.put(f"{API}/client/profile", json=prof, headers=headers)
+        assert pr.status_code == 200, pr.text
+        return c, headers
+
+    def _fetch_menu(self, s, headers):
+        r = s.get(f"{API}/menu/current", headers=headers)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def _cleanup(self, s, admin_headers, cid):
+        try:
+            s.delete(f"{API}/admin/clients/{cid}", headers=admin_headers)
+        except Exception:
+            pass
+
+    def test_lose_client_snacks_filled_no_bulk_only(self, s, admin_headers):
+        c, headers = self._login_client(s, admin_headers, "Lean Lisa", "lose")
+        try:
+            menu = self._fetch_menu(s, headers)
+            recipes = menu["recipes"]
+            snacks_used = []
+            for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:
+                slug = menu["days"][d].get("snack")
+                assert slug, f"Snack missing for {d}"
+                snacks_used.append(recipes[slug])
+            # None should be tagged ONLY 'bulk' without 'balanced' or 'lean'
+            for r in snacks_used:
+                tags = set(r.get("tags") or [])
+                assert "bulk" not in tags or (tags & {"lean", "balanced"}), \
+                    f"lose client got bulk-only snack: {r['slug']} tags={tags}"
+        finally:
+            self._cleanup(s, admin_headers, c["id"])
+
+    def test_gain_client_snacks_filled_no_lean_only(self, s, admin_headers):
+        c, headers = self._login_client(s, admin_headers, "Bulk Bob", "gain")
+        try:
+            menu = self._fetch_menu(s, headers)
+            recipes = menu["recipes"]
+            for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:
+                slug = menu["days"][d].get("snack")
+                assert slug, f"Snack missing for {d}"
+                tags = set(recipes[slug].get("tags") or [])
+                assert "lean" not in tags or (tags & {"bulk", "balanced"}), \
+                    f"gain client got lean-only snack: {slug} tags={tags}"
+        finally:
+            self._cleanup(s, admin_headers, c["id"])
+
+    def test_maintain_client_snacks_filled(self, s, admin_headers):
+        c, headers = self._login_client(s, admin_headers, "Maintain Mo", "maintain")
+        try:
+            menu = self._fetch_menu(s, headers)
+            for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:
+                assert menu["days"][d].get("snack"), f"Snack missing for {d}"
+        finally:
+            self._cleanup(s, admin_headers, c["id"])
+
+    def test_two_clients_same_goal_get_different_snacks(self, s, admin_headers):
+        c1, h1 = self._login_client(s, admin_headers, "A One", "maintain")
+        c2, h2 = self._login_client(s, admin_headers, "B Two", "maintain")
+        try:
+            m1 = self._fetch_menu(s, h1)
+            m2 = self._fetch_menu(s, h2)
+            s1 = [m1["days"][d]["snack"] for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]]
+            s2 = [m2["days"][d]["snack"] for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]]
+            assert s1 != s2, f"Two different clients got IDENTICAL snack week: {s1}"
+        finally:
+            self._cleanup(s, admin_headers, c1["id"])
+            self._cleanup(s, admin_headers, c2["id"])
+
+    def test_shopping_list_includes_snack_ingredients(self, s, admin_headers, created_client):
+        # Fetch client menu first so ingredients are known
+        headers = {"Authorization": f"Bearer {created_client['id']}:{created_client['code']}",
+                   "Content-Type": "application/json"}
+        menu = s.get(f"{API}/menu/current", headers=headers).json()
+        snack_ingredient_names = set()
+        for d, meals in menu["days"].items():
+            slug = meals.get("snack")
+            if slug and slug in menu["recipes"]:
+                for ing in menu["recipes"][slug]["ingredients"]:
+                    snack_ingredient_names.add(ing["name"].lower())
+        assert snack_ingredient_names, "No snack ingredients found in menu"
+        r = s.get(f"{API}/menu/shopping-list", headers=headers)
+        assert r.status_code == 200
+        shop_names = {i["name"].lower() for i in r.json()["items"]}
+        # At least one snack ingredient must appear in shopping list
+        overlap = snack_ingredient_names & shop_names
+        assert overlap, f"Shopping list missing snack ingredients. Snack ingredients: {snack_ingredient_names}"
+
+    def test_admin_get_client_menu_has_snack_each_day(self, s, admin_headers, created_client):
+        r = s.get(f"{API}/admin/clients/{created_client['id']}/menu", headers=admin_headers)
+        assert r.status_code == 200
+        days = r.json()["days"]
+        for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:
+            assert "snack" in days[d], f"'snack' key missing from admin menu day {d}"
+            assert days[d]["snack"], f"snack slot empty for {d}"
+
+    def test_admin_put_client_menu_persists_snack(self, s, admin_headers, created_client):
+        # Get a valid snack slug
+        recipes = s.get(f"{API}/recipes").json()
+        snack_slug = next(r["slug"] for r in recipes if r.get("category") == "snack")
+        breakfast_slug = next(r["slug"] for r in recipes if r.get("category") == "breakfast")
+        lunch_slug = next(r["slug"] for r in recipes if r.get("category") == "lunch")
+        dinner_slug = next(r["slug"] for r in recipes if r.get("category") == "dinner")
+        days = {d: {"breakfast": breakfast_slug, "lunch": lunch_slug, "dinner": dinner_slug, "snack": snack_slug}
+                for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]}
+        r = s.put(f"{API}/admin/clients/{created_client['id']}/menu",
+                  json={"days": days}, headers=admin_headers)
+        assert r.status_code == 200, r.text
+        # Verify via GET
+        r2 = s.get(f"{API}/admin/clients/{created_client['id']}/menu", headers=admin_headers)
+        got = r2.json()["days"]
+        for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:
+            assert got[d]["snack"] == snack_slug, f"Snack didn't persist for {d}"
+
+
 # ---------- Admin Delete ----------
 def test_admin_delete_client(s, admin_headers):
     email = f"test_del_{int(time.time())}@example.com"

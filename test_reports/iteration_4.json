@@ -1,0 +1,37 @@
+{
+  "summary": "Verified end-to-end the '40 healthy snacks' feature for APT meal-prep. Backend: 9 new snack-specific tests added to /app/backend/tests/backend_test.py — all pass. Full suite 39/40 (one pre-existing admin-token-format assertion is unrelated to snacks). Frontend: client dashboard shows Snack card for all 7 days, admin Weekly menu tab has Snack column, per-client Meals editor modal has Snack column with dropdowns pre-populated. Shopping list aggregates snack ingredients. Client-seeded randomness confirmed (two maintain clients get different snack weeks). Goal-aware filtering works: lose clients receive no bulk-only snacks, gain clients receive no lean-only snacks.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/recipes", "issue": "Total recipe count is exactly 123 (83 base + 40 snacks). Verified. No issue."},
+      {"endpoint": "TestAdminAuth::test_admin_login_success (pre-existing)", "issue": "Admin login token now returns 'admin:<uuid>' instead of 'admin:<password>' — old test still asserts hardcoded password format. Unrelated to snacks feature; existed prior to this iteration. Consider updating assertion to r.json()['token'].startswith('admin:')."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DashboardPage header + marketing hero", "issue": "Dashboard subtitle says 'Mon–Sun · 21 meals' and totals text 'Totals across all 21 meals · approx. 2,238 kcal/day'. Marketing landing card also says 'THIS WEEK 21 meals · macros built in'. With snacks added, the plan now contains 28 meals/week (7 days x 4 slots), not 21. Copy needs to be updated (likely a hardcoded 21 or MEALS.length*7 that missed the 4th slot).", "selector": "text=/21 meals/", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Update the '21 meals' copy on DashboardPage (subtitle + totals line) and on the marketing hero card to reflect 28 meals (or compute dynamically = days * meals_per_day).",
+    "Optional: fix pre-existing TestAdminAuth::test_admin_login_success assertion to be format-agnostic (unrelated to snacks)."
+  ],
+  "critical_code_review_comments": [
+    "get_or_create_client_menu correctly falls back to by_cat_all when goal-filtered pool has < 7 items — good safety net (although with 40 snacks this shouldn't trigger).",
+    "Client-seeded randomness uses rng.Random(f'{client_id}:{ws_iso}:{goal}') — deterministic per-client per-week which is desirable; two different clients same goal reliably diverge.",
+    "Shopping-list aggregation iterates meals.values() so snack ingredients are naturally included — no per-meal-type special case needed. Confirmed via test that snack ingredients (Greek yogurt, peanut butter, almonds, etc.) show in the aggregated list.",
+    "admin_get_client_menu returns menu with snack key for every day. admin_update_client_menu accepts and persists arbitrary Dict[str, Dict[str, str]] so 'snack' key is transparently stored — no schema change needed. Verified with PUT-then-GET.",
+    "Hardcoded '21 meals' copy in dashboard/marketing indicates the count wasn't parameterised — brittle; should be derived from MEALS_PER_DAY * 7."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "97.5% (39/40; 100% (9/9) of new snack tests)", "frontend": "100% for snack visibility (dashboard, weekly menu, per-client editor)"},
+  "test_credentials": "Admin: abpt2025. nut_test@example.com code regenerated during test to 8951 (old 3956 was expired).",
+  "seed_data_creation": "Tests create temporary test_snack_lose/gain/maintain_* clients via admin API + set profile via /api/client/profile as the client. All cleaned up in test teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Snacks feature is functionally complete and integrated. Run pytest /app/backend/tests/backend_test.py::TestSnacks -v (9 tests). Note that the client code for nut_test@example.com is regenerated each rotation Monday — use POST /api/admin/clients/{id}/regenerate-code to refresh before UI tests. The pre-existing admin token format test failure is unrelated.",
+  "rca of the issue": "N/A — feature working. Only cosmetic issue is the '21 meals' hardcoded copy that wasn't updated when the 4th (snack) slot was added."
+}
