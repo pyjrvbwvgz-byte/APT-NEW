@@ -13,7 +13,7 @@ const fallback = {
       subscribe_cta: "Subscribe · €14.99 / mo",
       code_cta: "I have a 4-digit code",
     },
-    weekly_tile: { label: "THIS WEEK", title: "21 meals · macros built in", subtitle: "Real food. Real progress." },
+    weekly_tile: { label: "THIS WEEK", title: "28 meals · macros built in", subtitle: "Real food. Real progress." },
     pricing: {
       kicker: "Two ways in", title: "Pick your path.",
       subtitle: "Subscribe and access your plan anytime — or get a weekly 4-digit code from your APT coach.",

@@ -94,7 +94,7 @@ export default function SubscribePage() {
             </h2>
             <ul className="mt-6 space-y-3">
               {[
-                "Weekly Mon–Sun meal plan with 21 meals",
+                "Weekly Mon–Sun meal plan with 28 meals (incl. daily snack)",
                 "Per-recipe kcal, protein, carbs & fat",
                 "Auto-aggregated shopping list",
                 "Downloadable combined PDF",

@@ -1,0 +1,31 @@
+{
+  "summary": "Retested the '21 meals' → '28 meals' copy fix across all four surfaces (landing hero tile, client dashboard subtitle, dashboard weekly totals footer, subscribe plan bullet). All show '28 meals' and no '21 meals' remains anywhere in /app/frontend/src or /app/backend. Backend GET /api/site override no longer contains '21 meals'. Regression sanity for the 40 healthy snacks feature also passed: dashboard renders all 4 meal slots per day (BREAKFAST/LUNCH/DINNER/SNACK, 7 occurrences each = 28 meals).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verifications": {
+    "landing_page": "Hero weekly tile shows '28 meals · macros built in' (screenshot confirmed).",
+    "dashboard_subtitle": "Shows 'Week of August 3 · Mon–Sun · 28 meals'.",
+    "dashboard_footer": "Shows 'Totals across all 28 meals · approx. 2,238 kcal / day'.",
+    "subscribe_bullet": "Shows 'Weekly Mon–Sun meal plan with 28 meals (incl. daily snack)'.",
+    "grep_21_meals": "Zero occurrences of '21 meals' in /app/frontend/src/ and /app/backend/.",
+    "backend_site_api": "GET /api/site JSON does not contain '21 meals'; weekly_tile override is empty {} so frontend default '28 meals · macros built in' applies.",
+    "snacks_regression": "Dashboard renders 4 slots per day: BREAKFAST(7), LUNCH(7), DINNER(7), SNACK(7) = 28 cards."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Note: GET /api/site returns weekly_tile as an empty object ({}). Frontend siteContent defaults cover it, but it may be worth backfilling the DB override to '28 meals · macros built in' to keep API self-describing. Non-blocking."
+  ],
+  "updated_files": ["/app/memory/test_credentials.md"],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "test_credentials": "Client code rotated from 3956 → 8951 (verified via /api/admin/clients). Updated /app/memory/test_credentials.md accordingly. Admin password abpt2025 works.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Copy fix (21→28 meals) is complete on landing, dashboard, subscribe, and backend defaults. The nut_test@example.com client rotates weekly; if login returns 401, fetch current code with GET /api/admin/clients (admin token via POST /api/admin/login {password: abpt2025}). Current code as of this run: 8951.",
+  "rca of the issue": "N/A — this iteration only verified the previously-applied copy fix. No new bugs found."
+}

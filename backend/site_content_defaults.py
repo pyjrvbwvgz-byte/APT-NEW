@@ -13,7 +13,7 @@ SITE_CONTENT_DEFAULTS = {
         },
         "weekly_tile": {
             "label": "THIS WEEK",
-            "title": "21 meals · macros built in",
+            "title": "28 meals · macros built in",
             "subtitle": "Real food. Real progress.",
         },
         "pricing": {

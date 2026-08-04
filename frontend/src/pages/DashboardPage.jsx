@@ -165,7 +165,7 @@ export default function DashboardPage() {
                       day: "numeric",
                     })
                   : "—"}
-                · Mon–Sun · 21 meals
+                · Mon–Sun · 28 meals
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -281,7 +281,7 @@ export default function DashboardPage() {
               />
             </div>
             <p className="mt-3 text-xs text-[#5C7063]">
-              Totals across all 21 meals · approx. {Math.round(weeklyTotals.kcal / 7).toLocaleString()} kcal / day
+              Totals across all 28 meals · approx. {Math.round(weeklyTotals.kcal / 7).toLocaleString()} kcal / day
             </p>
           </section>
 
