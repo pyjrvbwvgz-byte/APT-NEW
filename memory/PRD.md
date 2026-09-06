@@ -33,3 +33,28 @@ Professional meal prep website with weekly menus, client profiles, PDF download,
 - P1: Theme color picker in Website tab
 - P2: "Pick from existing uploads" image gallery
 - P2: Goal weight field so chart can show a reference line
+
+## 2026-02 — Public site redesign (dark reference-style)
+Request: "completely change the website layout" to match a dark, bold fitness marketing reference.
+User choices: dark theme on PUBLIC pages only; accent electric blue #38bdf8; nothing from the reference avoided.
+
+Implemented (2026-02, tested — iteration_6.json, 100% frontend pass):
+- `index.css`: dark root theme (Schibsted Grotesk / IBM Plex Sans / PT Serif), grain + skew-clip + marquee + rise-in utilities,
+  `.theme-light` escape hatch (dashboard/recipe/admin stay light) and `.theme-dark-bar` (header/footer keep dark tokens inside light pages),
+  `.logo-on-dark` (inverts the black .VPT mark on dark surfaces).
+- `Layout.jsx`: new dark Header (scrolling announcement bar + CMS nav links + mobile menu, `marketing` prop) and big dark Footer with marquee strapline.
+- `LandingPage.jsx`: rebuilt — full-bleed hero, stats band, alternating feature rows (circle/rounded/skew image shapes), 4-up how-it-works grid, extras gallery, closing CTA. All content from `GET /api/site`.
+- `AuthPage`/`SubscribePage`/`SubscribeSuccessPage`: dark restyle.
+- `site_content_defaults.py`: new editable shape — announcement, nav.links, landing.hero(kicker/title_prefix/title_highlight/subtitle/bg_image_url/CTAs), stats.items, features.items(+shape), how.steps, cta, footer(brand/tagline/support/lines/copyright/strapline), extras.
+- `AdminContentTab.jsx`: CMS editor rewritten for the new shape (incl. nav-link editor, stat/feature/step repeaters, image-shape dropdown, footer fields).
+- `server.py`: fixed ObjectId serialisation in `admin_create_recipe`.
+
+Note: preview only — user must redeploy for apttrains.com to pick this up.
+
+## P0/P1 Backlog (updated)
+- P1: Scale RecipePage kcal/macros/ingredients to client's day-scale
+- P1: Include daily targets on the downloadable PDF
+- P1: Theme accent-colour picker in the Website tab (CSS var driven)
+- P2: Dark pass over the client dashboard + admin (currently `.theme-light`)
+- P2: "Pick from existing uploads" image gallery
+- P2: Goal weight field so chart can show a reference line

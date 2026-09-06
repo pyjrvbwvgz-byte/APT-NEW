@@ -18,7 +18,7 @@ export default function RecipePage() {
   }, [slug]);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col theme-light">
       <Header />
       <main className="flex-1 py-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">

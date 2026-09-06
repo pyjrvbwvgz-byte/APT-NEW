@@ -102,7 +102,7 @@ export default function DashboardPage() {
   const needsProfile = !client?.profile_completed_at;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col theme-light">
       {needsProfile && (
         <ProfileIntakeModal
           client={client}

@@ -1059,7 +1059,7 @@ async def admin_create_recipe(payload: RecipeCreateIn, _: bool = Depends(require
         raise HTTPException(status_code=400, detail="A recipe with this slug already exists")
     doc = payload.model_dump()
     doc["id"] = str(uuid.uuid4())
-    await db.recipes.insert_one(doc)
+    await db.recipes.insert_one(dict(doc))
     return doc
 
 @api_router.delete("/admin/recipes/{slug}")

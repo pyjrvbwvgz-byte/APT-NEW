@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only regression of the new dark public-site redesign + CMS editor. All requested flows pass: landing page renders full dark layout (announcement, header, hero, stats, features, how, cta, footer marquee) with no console/pageerrors, all CTA links point to correct routes, mobile menu works and hero doesn't overflow (scrollWidth==390), /auth OTP + email login lands on /dashboard in light theme, /recipe/breakfast-bagel renders readable in light theme with ingredients+macros+Back-to-plan, /subscribe shows \u20ac14.99, What's included list and enabled subscribe-submit-btn, /subscribe?cancelled=1 shows cancelled-notice, /subscribe/success activate-btn flow shows activate-message on unknown email without crashing, /admin content tab renders all fields without undefined crashes and CMS save->public re-render round trip works (kicker updated then restored), other admin tabs (Clients/Weekly menu/Meals) still render in light theme.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Update /app/memory/test_credentials.md: current active code for nut_test@example.com is 4920 (doc says 8951, which is expired). Consider a stable seeding strategy so weekly rotation doesn't invalidate documented QA credentials."
+  ],
+  "critical_code_review_comments": [
+    "site_content_defaults.py ships 4 how-it-works steps but the deployed DB content has only 3 steps and the title 'Three steps. No excuses.' -- request wording says '4-step how it works grid'. Not a crash, but decide which is source of truth. Currently landing renders 3 how-step cards, matches the title.",
+    "AdminContentTab passes testId prop for the hero background image field via a wrapper component; the raw [data-testid=\"hero-image\"] query returned 0 in my sanity scan. Recommend spreading data-testid on the actual <input> so E2E selectors are consistent with the other admin fields."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100%"},
+  "test_credentials": "Admin abpt2025 works. Client nut_test@example.com uses code 4920 (not 8951 as documented in test_credentials.md).",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The dark public redesign is functional and readable. If retesting auth, fetch current 4-digit code via /api/admin/clients (Bearer admin token from POST /api/admin/login {password:abpt2025}) because weekly rotation invalidates codes. Data-testids on landing page are stable; CMS editor tab is labelled 'Website' (button:has-text(\"Website\"))."
+}

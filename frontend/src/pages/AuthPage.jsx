@@ -36,26 +36,34 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#0c0d10]">
       <Header />
-      <main className="flex-1 py-12 lg:py-20">
+      <main className="flex-1 py-16 lg:py-24">
         <div className="max-w-md mx-auto px-4">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#F3F7F4] border border-[#E5EFE8] px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#5C7063]">
-              <KeyRound className="w-3 h-3 text-[#10B981]" /> Coaching clients
+          <div className="mb-10">
+            <div className="flex items-center gap-3">
+              <span className="h-px w-10 bg-[#38bdf8]" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">
+                Coaching clients
+              </span>
             </div>
-            <h1 className="font-display text-4xl font-bold mt-4 text-[#111C15] tracking-tight">
+            <h1 className="mt-6 font-display text-4xl font-bold uppercase leading-[0.95] tracking-tight text-white lg:text-5xl">
               Enter your code
             </h1>
-            <p className="mt-2 text-[#5C7063]">
+            <p className="mt-4 text-sm leading-relaxed text-white/50">
               Your APT coach sends a fresh 4-digit code every Monday.
             </p>
           </div>
 
-          <div className="bg-white border border-[#E5EFE8] rounded-2xl p-6 shadow-sm">
-            <form onSubmit={onLogin} className="space-y-5">
+          <div className="rounded-[1.5rem] border border-white/10 bg-[#15161a] p-7">
+            <form onSubmit={onLogin} className="space-y-6">
               <div>
-                <Label htmlFor="login-email">Email</Label>
+                <Label
+                  htmlFor="login-email"
+                  className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45"
+                >
+                  Email
+                </Label>
                 <Input
                   id="login-email"
                   type="email"
@@ -63,35 +71,44 @@ export default function AuthPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   data-testid="login-email-input"
-                  className="mt-1.5"
+                  className="mt-2 h-12 border-white/15 bg-[#0c0d10] text-white placeholder:text-white/25"
                 />
               </div>
               <div>
-                <Label>4-digit code</Label>
-                <div className="mt-3 flex justify-center">
+                <Label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                  4-digit code
+                </Label>
+                <div className="mt-4 flex justify-center">
                   <OTPInput value={code} onChange={setCode} />
                 </div>
               </div>
               <Button
                 type="submit"
                 disabled={busy}
-                className="w-full bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 font-semibold"
+                className="h-14 w-full rounded-full bg-[#38bdf8] text-xs font-semibold uppercase tracking-[0.2em] text-[#08090b] hover:bg-white"
                 data-testid="login-submit-btn"
               >
                 {busy ? "…" : "Enter dashboard"}
-                {!busy && <ArrowRight className="w-4 h-4 ml-2" />}
+                {!busy && <ArrowRight className="ml-3 h-4 w-4" />}
               </Button>
             </form>
           </div>
 
-          <div className="text-center mt-6 text-sm text-[#5C7063]">
-            Not coaching with Abraham?{" "}
-            <Link to="/subscribe" className="text-[#10B981] hover:underline font-medium" data-testid="to-subscribe-link">
-              Subscribe for €14.99/mo
-            </Link>
+          <div className="mt-8 flex items-start gap-3 text-sm text-white/45">
+            <KeyRound className="mt-0.5 h-4 w-4 flex-none text-[#38bdf8]" />
+            <div>
+              Not coaching with Abraham?{" "}
+              <Link
+                to="/subscribe"
+                className="font-medium text-[#38bdf8] hover:text-white"
+                data-testid="to-subscribe-link"
+              >
+                Subscribe for €14.99/mo
+              </Link>
+            </div>
           </div>
-          <div className="text-center mt-3 text-xs text-[#5C7063]">
-            <Link to="/" className="hover:text-[#10B981]" data-testid="back-home-link">
+          <div className="mt-4 text-xs text-white/30">
+            <Link to="/" className="hover:text-white" data-testid="back-home-link">
               ← Back to home
             </Link>
           </div>

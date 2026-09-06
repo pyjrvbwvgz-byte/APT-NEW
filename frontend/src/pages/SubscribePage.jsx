@@ -4,7 +4,16 @@ import axios from "axios";
 import { API } from "../lib/api";
 import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
-import { Check, CreditCard, ShieldCheck, ArrowLeft, Lock, ArrowRight, KeyRound } from "lucide-react";
+import { Check, ShieldCheck, ArrowLeft, Lock, ArrowRight, KeyRound } from "lucide-react";
+
+const INCLUDED = [
+  "Weekly Mon–Sun meal plan with 28 meals (incl. daily snack)",
+  "Per-recipe kcal, protein, carbs & fat",
+  "Auto-aggregated shopping list",
+  "Downloadable combined PDF",
+  "New menus every Monday",
+  "Cancel anytime — self-service in Stripe",
+];
 
 export default function SubscribePage() {
   const [params] = useSearchParams();
@@ -16,39 +25,46 @@ export default function SubscribePage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#0c0d10]">
       <Header />
-      <main className="flex-1 py-12 lg:py-20">
-        <div className="max-w-5xl mx-auto px-4 grid lg:grid-cols-2 gap-10 items-start">
+      <main className="flex-1 py-16 lg:py-24">
+        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10 grid gap-12 lg:grid-cols-12 lg:gap-16 items-start">
           {/* Left */}
-          <div>
+          <div className="lg:col-span-7">
             <Link
               to="/"
-              className="inline-flex items-center text-sm text-[#5C7063] hover:text-[#10B981] mb-6"
+              className="mb-8 inline-flex items-center text-[10px] font-semibold uppercase tracking-[0.24em] text-white/40 hover:text-white"
               data-testid="back-home-link"
             >
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to home
+              <ArrowLeft className="mr-2 h-3.5 w-3.5" /> Back to home
             </Link>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#F3F7F4] border border-[#E5EFE8] px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#5C7063]">
-              <CreditCard className="w-3 h-3 text-[#10B981]" /> Monthly subscription
+            <div className="flex items-center gap-3">
+              <span className="h-px w-10 bg-[#38bdf8]" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">
+                Monthly subscription
+              </span>
             </div>
-            <h1 className="font-display text-4xl lg:text-5xl font-bold mt-4 text-[#111C15] tracking-tight">
-              €14.99 / month.
+            <h1 className="mt-6 font-display text-5xl font-bold uppercase leading-[0.9] tracking-tight text-white lg:text-7xl">
+              €14.99
+              <span className="block font-serif-accent normal-case italic text-[#38bdf8]">
+                per month
+              </span>
             </h1>
-            <p className="mt-3 text-[#5C7063]">
-              Full access to weekly meal plans, recipes with macros, the auto shopping list and PDF download. Cancel anytime.
+            <p className="mt-7 max-w-lg text-base leading-relaxed text-white/50">
+              Full access to weekly meal plans, recipes with macros, the auto shopping list and PDF
+              download. Cancel anytime.
             </p>
 
             {cancelled && (
               <div
-                className="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                className="mt-8 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
                 data-testid="cancelled-notice"
               >
                 Checkout was cancelled. No payment was taken — try again when you're ready.
               </div>
             )}
 
-            <div className="mt-8 bg-white border border-[#E5EFE8] rounded-2xl p-6 shadow-sm">
+            <div className="mt-10 rounded-[1.5rem] border border-white/10 bg-[#15161a] p-7">
               <a
                 href={paymentLink || "#"}
                 target={paymentLink ? "_self" : "_blank"}
@@ -62,62 +78,60 @@ export default function SubscribePage() {
                 <Button
                   type="button"
                   disabled={!paymentLink}
-                  className="w-full bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 font-semibold"
+                  className="group h-14 w-full rounded-full bg-[#38bdf8] text-xs font-semibold uppercase tracking-[0.2em] text-[#08090b] hover:bg-white"
                   data-testid="subscribe-submit-btn"
                 >
-                  Continue to secure checkout <ArrowRight className="w-4 h-4 ml-2" />
+                  Continue to secure checkout
+                  <ArrowRight className="ml-3 h-4 w-4 group-hover:translate-x-1" />
                 </Button>
               </a>
-              <div className="flex items-center justify-center gap-2 text-xs text-[#5C7063] pt-4">
-                <Lock className="w-3 h-3" /> Secure payment by Stripe
+              <div className="flex items-center justify-center gap-2 pt-5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
+                <Lock className="h-3 w-3" /> Secure payment by Stripe
               </div>
-              <p className="text-xs text-[#5C7063] mt-3 text-center leading-relaxed">
+              <p className="mt-4 text-center text-xs leading-relaxed text-white/35">
                 You'll enter your card details on Stripe. After payment we'll bring you back to log in.
               </p>
             </div>
 
-            <div className="mt-6 text-sm text-[#5C7063] text-center">
+            <div className="mt-6 text-sm text-white/45">
               Already paid?{" "}
-              <Link to="/subscribe/success" className="text-[#10B981] hover:underline font-medium">
+              <Link
+                to="/subscribe/success"
+                className="font-medium text-[#38bdf8] hover:text-white"
+                data-testid="activate-access-link"
+              >
                 Activate access
               </Link>
             </div>
           </div>
 
           {/* Right */}
-          <div className="bg-white border border-[#E5EFE8] rounded-2xl p-8 lg:sticky lg:top-24">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">
+          <div className="lg:col-span-5 rounded-[1.5rem] border border-white/10 bg-[#101216] p-8 lg:sticky lg:top-28">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">
               What's included
             </div>
-            <h2 className="font-display text-2xl font-semibold text-[#111C15] mt-2">
-              Everything you need to prep.
+            <h2 className="mt-4 font-display text-2xl font-bold uppercase leading-tight tracking-tight text-white">
+              Everything you need to prep
             </h2>
-            <ul className="mt-6 space-y-3">
-              {[
-                "Weekly Mon–Sun meal plan with 28 meals (incl. daily snack)",
-                "Per-recipe kcal, protein, carbs & fat",
-                "Auto-aggregated shopping list",
-                "Downloadable combined PDF",
-                "New menus every Monday",
-                "Cancel anytime — self-service in Stripe",
-              ].map((t) => (
-                <li key={t} className="flex gap-3 text-[#111C15]">
-                  <Check className="w-5 h-5 text-[#10B981] flex-none mt-0.5" /> {t}
+            <ul className="mt-8 space-y-4">
+              {INCLUDED.map((t) => (
+                <li key={t} className="flex gap-3 text-sm text-white/70">
+                  <Check className="mt-0.5 h-4 w-4 flex-none text-[#38bdf8]" /> {t}
                 </li>
               ))}
             </ul>
-            <div className="mt-8 border-t border-[#E5EFE8] pt-6 flex items-start gap-3 text-sm text-[#5C7063]">
-              <KeyRound className="w-5 h-5 text-[#10B981] flex-none" />
+            <div className="mt-8 flex items-start gap-3 border-t border-white/10 pt-7 text-sm text-white/45">
+              <KeyRound className="h-4 w-4 flex-none text-[#38bdf8]" />
               <div>
                 Already a coaching client? Use your weekly{" "}
-                <Link to="/auth" className="underline text-[#1A3622] hover:text-[#10B981]">
+                <Link to="/auth" className="underline hover:text-white">
                   4-digit code instead
                 </Link>
                 .
               </div>
             </div>
-            <div className="mt-3 flex items-start gap-3 text-sm text-[#5C7063]">
-              <ShieldCheck className="w-5 h-5 text-[#10B981] flex-none" />
+            <div className="mt-4 flex items-start gap-3 text-sm text-white/45">
+              <ShieldCheck className="h-4 w-4 flex-none text-[#38bdf8]" />
               <div>Powered by Stripe. We never see or store your card details.</div>
             </div>
           </div>

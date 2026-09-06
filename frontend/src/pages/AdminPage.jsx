@@ -56,7 +56,7 @@ export default function AdminPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col theme-light">
         <Header />
         <div className="flex-1 flex items-center justify-center text-[#5C7063]">Checking session…</div>
       </div>
@@ -78,7 +78,7 @@ export default function AdminPage() {
       }
     };
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col theme-light">
         <Header />
         <main className="flex-1 py-16">
           <div className="max-w-sm mx-auto px-4">
@@ -247,7 +247,7 @@ function AdminDashboard({ onLogout }) {
   const byCategory = (cat) => recipes.filter((r) => r.category === cat);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col theme-light">
       <Header
         right={
           <Button

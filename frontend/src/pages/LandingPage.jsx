@@ -2,182 +2,275 @@ import { Link } from "react-router-dom";
 import { Header, Footer } from "../components/Layout";
 import { Button } from "../components/ui/button";
 import { useSiteContent } from "../lib/siteContent";
-import { ArrowRight, Salad, FileDown, KeyRound, Check, Sparkles, CreditCard, ShieldCheck } from "lucide-react";
+import { ArrowRight, KeyRound, ArrowDown } from "lucide-react";
+
+const shapeClass = {
+  circle: "rounded-full aspect-square",
+  rounded: "rounded-[2rem] aspect-[4/3]",
+  skew: "clip-skew aspect-[4/3]",
+};
 
 export default function LandingPage() {
   const { content } = useSiteContent();
-  const h = content.landing.hero;
-  const tile = content.landing.weekly_tile;
-  const p = content.landing.pricing;
-  const how = content.landing.how;
-  const bottom = content.landing.cta;
+  const l = content.landing || {};
+  const h = l.hero || {};
+  const stats = l.stats || {};
+  const features = l.features || {};
+  const how = l.how || {};
+  const bottom = l.cta || {};
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#0c0d10]">
       <Header
+        marketing
         right={
           <>
-            <Link to="/admin" className="text-sm text-[#5C7063] hover:text-[#10B981]" data-testid="admin-link">Admin</Link>
-            <Link to="/auth" data-testid="header-auth-link" className="hidden sm:block">
-              <Button variant="outline" className="rounded-md border-[#E5EFE8]">I have a code</Button>
+            <Link to="/auth" data-testid="header-auth-link">
+              <Button
+                variant="ghost"
+                className="h-10 rounded-full px-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70 hover:bg-white/5 hover:text-white"
+              >
+                Client code
+              </Button>
             </Link>
             <Link to="/subscribe" data-testid="header-subscribe-link">
-              <Button className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md">Subscribe</Button>
+              <Button className="h-10 rounded-full bg-[#38bdf8] px-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#08090b] hover:bg-white">
+                Subscribe
+              </Button>
             </Link>
           </>
         }
       />
 
-      {/* HERO */}
-      <section className="relative overflow-hidden">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center select-none">
-          <img src="/brand/apt-mark.png" alt="" className="w-[140%] max-w-none opacity-[0.08] lg:opacity-[0.1] -translate-y-4" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 lg:pt-24 lg:pb-20 grid lg:grid-cols-12 gap-10 items-center">
-          <div className="lg:col-span-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#E5EFE8] bg-white px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-[#5C7063]">
-              <Sparkles className="w-3.5 h-3.5 text-[#10B981]" /> {h.badge}
+      {/* ── HERO ───────────────────────────────────────── */}
+      <section className="relative isolate grain overflow-hidden" data-testid="hero-section">
+        {h.bg_image_url && (
+          <img
+            src={h.bg_image_url}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover opacity-40"
+          />
+        )}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[linear-gradient(105deg,#0c0d10_8%,rgba(12,13,16,0.82)_45%,rgba(12,13,16,0.35)_100%)]"
+        />
+        <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 pt-24 pb-20 lg:pt-36 lg:pb-32">
+          <div className="max-w-4xl rise-in">
+            <div className="flex items-center gap-4">
+              <span className="h-px w-14 bg-[#38bdf8]" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#38bdf8]">
+                {h.kicker}
+              </span>
             </div>
-            <h1 className="mt-6 font-display text-5xl lg:text-7xl font-bold text-[#111C15] tracking-tight text-balance">
-              {h.title_line1}
-              <br />
-              <span className="text-[#10B981]">{h.title_line2}</span>
+            <h1 className="mt-8 font-display text-[13vw] leading-[0.86] font-bold uppercase tracking-tight text-white sm:text-6xl lg:text-[7.5rem]">
+              {h.title_prefix}{" "}
+              <span className="font-serif-accent block normal-case italic text-[#38bdf8]">
+                {h.title_highlight}
+              </span>
             </h1>
-            <p
-              className="mt-6 text-lg text-[#5C7063] max-w-xl leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: h.subtitle_html }}
-            />
-            <div className="mt-8 flex flex-wrap gap-3">
+            <p className="mt-9 max-w-xl text-base leading-relaxed text-white/55 lg:text-lg">
+              {h.subtitle}
+            </p>
+            <div className="mt-11 flex flex-wrap items-center gap-4">
               <Link to="/subscribe" data-testid="hero-cta-subscribe">
-                <Button size="lg" className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md px-7 h-12 text-base font-semibold">
-                  {h.subscribe_cta} <ArrowRight className="w-4 h-4 ml-2" />
+                <Button className="group h-14 rounded-full bg-[#38bdf8] px-9 text-xs font-semibold uppercase tracking-[0.2em] text-[#08090b] hover:bg-white">
+                  {h.primary_cta}
+                  <ArrowRight className="ml-3 h-4 w-4 group-hover:translate-x-1" />
                 </Button>
               </Link>
               <Link to="/auth" data-testid="hero-cta-have-code">
-                <Button size="lg" variant="outline" className="rounded-md px-7 h-12 text-base border-[#E5EFE8] hover:bg-[#F3F7F4]">
-                  <KeyRound className="w-4 h-4 mr-2" /> {h.code_cta}
+                <Button
+                  variant="outline"
+                  className="h-14 rounded-full border-white/20 bg-transparent px-9 text-xs font-semibold uppercase tracking-[0.2em] text-white hover:bg-white/5 hover:text-white"
+                >
+                  <KeyRound className="mr-3 h-4 w-4" /> {h.secondary_cta}
                 </Button>
               </Link>
             </div>
-            <div className="mt-10 flex flex-wrap items-center gap-6 text-sm text-[#5C7063]">
-              <div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#10B981]" /> Cancel anytime</div>
-              <div className="flex items-center gap-2"><FileDown className="w-4 h-4 text-[#10B981]" /> PDF download</div>
-              <div className="flex items-center gap-2"><Salad className="w-4 h-4 text-[#10B981]" /> Mon–Sun plan + macros</div>
-            </div>
           </div>
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-3xl overflow-hidden border border-[#E5EFE8] bg-white shadow-sm">
-              <img src={h.image_url} alt="Meal prep" className="w-full h-[460px] object-cover" />
-            </div>
-            <div className="hidden lg:block absolute -bottom-6 -left-6 bg-white border border-[#E5EFE8] shadow-sm rounded-2xl px-5 py-4 max-w-[260px]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#5C7063]">{tile.label}</div>
-              <div className="font-display text-2xl font-bold text-[#111C15] leading-tight mt-1">{tile.title}</div>
-              <div className="text-sm text-[#5C7063] mt-1">{tile.subtitle}</div>
-            </div>
+          <div className="mt-24 hidden items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/30 lg:flex">
+            <ArrowDown className="h-4 w-4 animate-bounce" /> Scroll
           </div>
         </div>
       </section>
 
-      {/* PRICING */}
-      <section id="access" className="py-16 lg:py-24 bg-[#F3F7F4]/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mb-12">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">{p.kicker}</div>
-            <h2 className="mt-3 font-display text-3xl lg:text-5xl font-semibold text-[#111C15] tracking-tight">{p.title}</h2>
-            <p className="mt-3 text-[#5C7063]">{p.subtitle}</p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-3xl border border-[#10B981] p-8 lg:p-10 relative overflow-hidden">
-              {p.subscription.badge && (
-                <div className="absolute top-5 right-5 text-[10px] uppercase tracking-[0.2em] bg-[#10B981] text-white px-2.5 py-1 rounded-full">{p.subscription.badge}</div>
-              )}
-              <div className="inline-flex items-center gap-2 text-[#10B981]">
-                <CreditCard className="w-5 h-5" />
-                <span className="text-xs uppercase tracking-[0.2em] font-medium">{p.subscription.label}</span>
+      {/* ── STATS ──────────────────────────────────────── */}
+      <section className="border-y border-white/10 bg-[#101216]" data-testid="stats-section">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-16 lg:py-24">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#38bdf8]">
+                {stats.kicker}
               </div>
-              <div className="mt-6 flex items-baseline gap-2">
-                <span className="font-display text-6xl font-bold text-[#111C15] tracking-tight">{p.subscription.price}</span>
-                <span className="text-[#5C7063]">{p.subscription.period}</span>
-              </div>
-              <ul className="mt-8 space-y-3">
-                {(p.subscription.bullets || []).map((t) => (
-                  <li key={t} className="flex gap-3 text-[#111C15]"><Check className="w-5 h-5 text-[#10B981] flex-none mt-0.5" /> {t}</li>
-                ))}
-              </ul>
-              <Link to="/subscribe" className="block mt-8" data-testid="pricing-subscribe-btn">
-                <Button size="lg" className="w-full bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 font-semibold">{p.subscription.cta} <ArrowRight className="w-4 h-4 ml-2" /></Button>
-              </Link>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-[#E5EFE8] p-8 lg:p-10">
-              <div className="inline-flex items-center gap-2 text-[#1A3622]">
-                <KeyRound className="w-5 h-5" />
-                <span className="text-xs uppercase tracking-[0.2em] font-medium">{p.code.label}</span>
-              </div>
-              <div className="mt-6 flex items-baseline gap-2">
-                <span className="font-display text-5xl font-bold text-[#111C15] tracking-tight">{p.code.title}</span>
-              </div>
-              <p className="mt-3 text-[#5C7063]">{p.code.subtitle}</p>
-              <ul className="mt-8 space-y-3">
-                {(p.code.bullets || []).map((t) => (
-                  <li key={t} className="flex gap-3 text-[#111C15]"><Check className="w-5 h-5 text-[#10B981] flex-none mt-0.5" /> {t}</li>
-                ))}
-              </ul>
-              <Link to="/auth" className="block mt-8" data-testid="pricing-have-code-btn">
-                <Button size="lg" variant="outline" className="w-full rounded-md h-12 font-semibold border-[#E5EFE8] hover:bg-[#F3F7F4]">{p.code.cta} <ArrowRight className="w-4 h-4 ml-2" /></Button>
-              </Link>
+              <h2 className="mt-4 max-w-lg font-display text-3xl font-bold uppercase leading-[1.05] tracking-tight text-white lg:text-5xl">
+                {stats.title}
+              </h2>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* HOW */}
-      <section id="how" className="py-16 lg:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">{how.kicker}</div>
-            <h2 className="mt-3 font-display text-3xl lg:text-5xl font-semibold text-[#111C15] tracking-tight">{how.title}</h2>
-          </div>
-          <div className="mt-12 grid md:grid-cols-3 gap-6">
-            {(how.steps || []).map((s) => (
-              <div key={s.n} className="bg-white rounded-2xl border border-[#E5EFE8] p-8 hover:-translate-y-0.5 transition-transform">
-                <div className="font-display text-5xl font-bold text-[#10B981]/30 tracking-tight">{s.n}</div>
-                <div className="mt-4 font-display text-2xl font-semibold text-[#111C15]">{s.t}</div>
-                <p className="mt-2 text-[#5C7063] leading-relaxed">{s.d}</p>
+          <div className="mt-14 grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4">
+            {(stats.items || []).map((s, i) => (
+              <div
+                key={i}
+                className="border-l border-white/10 pl-5"
+                data-testid={`stat-item-${i}`}
+              >
+                <div className="font-display text-4xl font-bold tracking-tight text-[#38bdf8] lg:text-6xl">
+                  {s.value}
+                </div>
+                <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                  {s.label}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Extras (admin-uploadable) */}
-      {content.extras && content.extras.length > 0 && (
-        <section className="py-16 bg-[#F3F7F4]/60">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-3 gap-6">
-            {content.extras.map((e, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-[#E5EFE8] overflow-hidden">
-                {e.image_url && <img src={e.image_url} alt={e.title || ""} className="w-full h-48 object-cover" />}
-                <div className="p-5">
-                  <div className="font-display text-xl font-semibold text-[#111C15]">{e.title}</div>
-                  <div className="mt-1 text-[#5C7063] text-sm">{e.caption}</div>
+      {/* ── FEATURES ───────────────────────────────────── */}
+      <section id="meals" className="py-20 lg:py-32" data-testid="features-section">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+          <div className="max-w-2xl">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#38bdf8]">
+              {features.kicker}
+            </div>
+            <h2 className="mt-4 font-display text-4xl font-bold uppercase leading-[0.95] tracking-tight text-white lg:text-6xl">
+              {features.title}
+            </h2>
+          </div>
+
+          <div className="mt-20 space-y-24 lg:space-y-32">
+            {(features.items || []).map((f, i) => (
+              <div
+                key={i}
+                className="grid items-center gap-10 lg:grid-cols-12 lg:gap-16"
+                data-testid={`feature-row-${i}`}
+              >
+                <div
+                  className={`lg:col-span-6 ${i % 2 === 1 ? "lg:order-2" : ""}`}
+                >
+                  <div className="overflow-hidden bg-[#15161a]">
+                    {f.image_url && (
+                      <img
+                        src={f.image_url}
+                        alt={f.title}
+                        className={`w-full object-cover ${shapeClass[f.shape] || shapeClass.rounded}`}
+                      />
+                    )}
+                  </div>
                 </div>
+                <div className="lg:col-span-6">
+                  <div className="flex items-center gap-4">
+                    <span className="font-display text-sm font-bold text-white/20">
+                      0{i + 1}
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#38bdf8]">
+                      {f.kicker}
+                    </span>
+                  </div>
+                  <h3 className="mt-6 font-display text-3xl font-bold uppercase leading-[1.02] tracking-tight text-white lg:text-5xl">
+                    {f.title}
+                  </h3>
+                  <p className="mt-6 max-w-lg text-base leading-relaxed text-white/50">
+                    {f.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW ────────────────────────────────────────── */}
+      <section
+        id="about"
+        className="border-y border-white/10 bg-[#101216] py-20 lg:py-32"
+        data-testid="how-section"
+      >
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+          <div className="max-w-2xl">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#38bdf8]">
+              {how.kicker}
+            </div>
+            <h2 className="mt-4 font-display text-4xl font-bold uppercase leading-[0.95] tracking-tight text-white lg:text-6xl">
+              {how.title}
+            </h2>
+          </div>
+          <div className="mt-16 grid gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
+            {(how.steps || []).map((s, i) => (
+              <div
+                key={i}
+                className="group bg-[#101216] p-8 transition-colors hover:bg-[#15171c]"
+                data-testid={`how-step-${i}`}
+              >
+                <div className="font-display text-5xl font-bold tracking-tight text-white/10 group-hover:text-[#38bdf8]/40">
+                  {s.n}
+                </div>
+                <div className="mt-8 font-display text-xl font-bold uppercase tracking-tight text-white">
+                  {s.t}
+                </div>
+                <p className="mt-4 text-sm leading-relaxed text-white/45">{s.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── EXTRAS (admin-uploadable gallery) ──────────── */}
+      {content.extras && content.extras.length > 0 && (
+        <section className="py-20 lg:py-28" data-testid="extras-section">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 grid gap-8 md:grid-cols-3">
+            {content.extras.map((e, i) => (
+              <div key={i} className="group" data-testid={`extra-card-${i}`}>
+                {e.image_url && (
+                  <div className="overflow-hidden rounded-[1.5rem]">
+                    <img
+                      src={e.image_url}
+                      alt={e.title || ""}
+                      className="h-64 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                )}
+                <div className="mt-5 font-display text-xl font-bold uppercase tracking-tight text-white">
+                  {e.title}
+                </div>
+                <div className="mt-2 text-sm text-white/45">{e.caption}</div>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* CTA */}
-      <section className="py-20 bg-[#F3F7F4]/60">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="font-display text-4xl lg:text-5xl font-bold text-[#111C15] tracking-tight">{bottom.title}</h2>
-          <p className="mt-4 text-lg text-[#5C7063]">{bottom.subtitle}</p>
-          <div className="mt-8 flex justify-center gap-3 flex-wrap">
+      {/* ── CLOSING CTA ────────────────────────────────── */}
+      <section id="plans" className="relative overflow-hidden py-24 lg:py-36" data-testid="cta-section">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        >
+          <img src="/brand/apt-mark.png" alt="" className="w-[120%] max-w-none opacity-[0.04] logo-on-dark" />
+        </div>
+        <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+          <h2 className="max-w-4xl font-display text-4xl font-bold uppercase leading-[0.92] tracking-tight text-white lg:text-7xl">
+            {bottom.title}
+          </h2>
+          <p className="mt-8 max-w-xl text-base leading-relaxed text-white/50 lg:text-lg">
+            {bottom.subtitle}
+          </p>
+          <div className="mt-12 flex flex-wrap gap-4">
             <Link to="/subscribe" data-testid="bottom-cta-subscribe">
-              <Button size="lg" className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md px-8 h-12 font-semibold">{bottom.primary} <ArrowRight className="w-4 h-4 ml-2" /></Button>
+              <Button className="group h-14 rounded-full bg-[#38bdf8] px-9 text-xs font-semibold uppercase tracking-[0.2em] text-[#08090b] hover:bg-white">
+                {bottom.primary}
+                <ArrowRight className="ml-3 h-4 w-4 group-hover:translate-x-1" />
+              </Button>
             </Link>
             <Link to="/auth" data-testid="bottom-cta-code">
-              <Button size="lg" variant="outline" className="rounded-md px-8 h-12 border-[#E5EFE8] hover:bg-white">{bottom.secondary}</Button>
+              <Button
+                variant="outline"
+                className="h-14 rounded-full border-white/20 bg-transparent px-9 text-xs font-semibold uppercase tracking-[0.2em] text-white hover:bg-white/5 hover:text-white"
+              >
+                {bottom.secondary}
+              </Button>
             </Link>
           </div>
         </div>
