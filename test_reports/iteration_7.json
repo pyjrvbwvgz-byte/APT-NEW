@@ -1,0 +1,31 @@
+{
+  "summary": "Full backend+frontend regression for the weekly-code rotation refactor and the mobile-first dashboard/admin pass. 13/13 new pytest cases pass covering POST /api/cron/rotate-codes auth (401 missing/wrong, 2xx with correct WEBHOOK_CRON_SECRET), X-Webhook-Id idempotency (duplicate:true), background rotation actually mutates each active client's code and sets code_expires_at = next Sunday 06:00 Europe/Dublin, lapsed stripe-source clients are correctly SKIPPED while live subscribers ARE rotated, GET /api/admin/rotation-status returns the expected keys with cron_configured:true, POST /api/admin/rotate-codes still force-rotates, per-client regenerate-code mints a new 4-digit code, admin-created clients get source='admin', and nut_test can log in with its (regenerated) code and GET /menu/current returns days+recipes+targets+day_scales + shopping-list items. Frontend mobile (390x844) passes end-to-end: landing / /auth / /subscribe / /subscribe?cancelled=1 / /subscribe/success all have scrollWidth==390, header Subscribe link + hamburger + mobile menu work, hero-cta-subscribe is 358x56 (>=44). Dashboard shows access-card with the member's 4-digit code and 'Valid until Sun, Oct 18', targets-card, sticky day-selector defaulting to Sunday (today in server-time), day-tab-Mon and next/prev-day-btn update day-plan-title, meal links expose kcal/P/C/F and open /recipe/breakfast-bagel (390 scrollWidth preserved). Shopping tab: 6 aisle groups, 57 items, tick increments progress 0/57 -> 1/57, survives reload via localStorage, reset returns to 0/57. Progress tab: log-weight form saves (80.5 kg qa test appears in recent entries), chart renders at 348x208 inside viewport. Admin mobile: code-status-panel shows 'Last sent Sun 11 Oct, 16:22 - 18 members' and 'Next batch Sun 18 Oct, 06:00', Renew-all rotated 18 codes (verified sample code changed via API), 20 tappable client-card-* each exposing profile-m/meals-m/regen-m/remove-m. Desktop (1920x1080) regression: landing + dashboard (all testids visible, shopping list renders) + admin (all 4 tabs Clients/Weekly menu/Meals/Website render cleanly, 40 desktop client rows). No console pageerrors anywhere.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cron_rotation.py",
+    "/app/test_reports/pytest/cron_results.xml"
+  ],
+  "action_items": [
+    "Update /app/memory/test_credentials.md: live nut_test code at write time was 4068/7231/3044 depending on run; document says 2341. Codes rotate on manual admin button + weekly cron, so just state 'read live code from /api/admin/clients' rather than hard-coding.",
+    "The old backend_test.py has `assert r.json()[\"token\"] == f\"admin:{ADMIN_PASSWORD}\"` but the admin login now returns `admin:<random-hex>` with an expires_at. Old regression file will fail on that one assertion - main agent may want to loosen it to `startswith(\"admin:\")`."
+  ],
+  "critical_code_review_comments": [
+    "cron_rotate_codes acks 200 immediately and queues the rotation in BackgroundTasks, which is correct for the Emergent cron contract. The idempotency row is inserted BEFORE the background task runs, so if the background task crashes the duplicate guard still prevents a retry with the same X-Webhook-Id. If that becomes a problem in production, consider inserting only after successful completion or clearing the run_id on error.",
+    "eligible_for_weekly_code correctly excludes lapsed stripe clients but still rotates admin-source clients even if their code has long since expired - that is fine functionally but means a client who hasn't logged in for 10 weeks still gets a new code every Sunday. Not a bug, just confirming intent.",
+    "DayPlan next-day-btn is disabled on Sunday which is correct, but on first dashboard load (Sunday today) a QA script that assumes it is always clickable will time out - test code should check isDisabled first. Non-blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cron_rotation.py (new)"
+  ],
+  "success_rate": {"backend": "100% (13/13 new tests)", "frontend": "100%"},
+  "test_credentials": "Admin abpt2025; nut_test@example.com with freshly regenerated code via POST /api/admin/clients/{id}/regenerate-code (code changes on rotation). WEBHOOK_CRON_SECRET sourced from backend/.env.",
+  "seed_data_creation": "Backend tests create TEST_ prefixed clients and delete them in teardown. Added one weigh-in to nut_test (80.5 kg, 'qa test', today) via Progress tab during UI test - safe to leave or delete.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Admin token is now `admin:<random>` not `admin:<password>`. Admin login endpoint returns {token, expires_at}. For dashboard E2E, the server clock is ahead (reports Oct 2026); Sunday is 'today' in server time so next-day-btn is disabled on first load - start by tapping day-tab-Mon. Use data-testid=\"otp-digit-{0..3}\" to fill the 4-digit code one char per field. Mobile scrollWidth must equal 390. Backend test file test_cron_rotation.py now covers cron auth, rotation application, subscriber eligibility, status endpoint, admin force rotate, per-client regen, and nut_test login+menu regression - reuse as regression suite."
+}

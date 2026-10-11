@@ -58,3 +58,49 @@ Note: preview only — user must redeploy for apttrains.com to pick this up.
 - P2: Dark pass over the client dashboard + admin (currently `.theme-light`)
 - P2: "Pick from existing uploads" image gallery
 - P2: Goal weight field so chart can show a reference line
+
+## 2026-02 — Mobile-first pass + weekly code fix (tested: iteration_7.json, 100% backend 13/13 + 100% frontend)
+
+### Weekly access codes — root cause & fix
+Root cause: rotation ran in an in-process `asyncio` loop (`weekly_rotation_loop`), so it only fired
+while the server happened to be awake — deployed instances sleep, hence Mondays were missed live.
+- Loop deleted. Rotation now driven by the platform scheduler: `.emergent/crons.yml` → `weekly-codes`,
+  `cron: "0 6 * * 0"`, `timezone: Europe/Dublin` → `POST /api/cron/rotate-codes`.
+- Cron endpoint: constant-time Bearer check against `WEBHOOK_CRON_SECRET` (backend/.env),
+  idempotent on `X-Webhook-Id` (`db.cron_runs`), acks 2xx immediately and rotates in a BackgroundTask.
+- Code week is now **Sunday 06:00 → following Sunday 06:00 Europe/Dublin** (`code_week_start()`,
+  `next_code_expiry()`, `_dublin_anchor()`), replacing "expires Monday 00:00 UTC".
+- Subscribers now get a 4-digit code too: issued the moment the Stripe grant lands, and included in
+  every weekly renewal. `eligible_for_weekly_code()` skips `source == "stripe"` accounts whose
+  subscription has lapsed. New clients are tagged `source: admin | stripe`.
+- Self-heal: `maybe_rotate_codes()` catch-up still runs when the coach opens the client list.
+- `GET /api/admin/rotation-status` + new `admin/CodeStatusPanel.jsx` (last sent / count / next batch /
+  scheduler configured) with the manual "Renew all codes now" button.
+- Members see their own code + expiry in the dashboard (`components/AccessCard.jsx`, copy-to-clipboard).
+
+### Mobile-first
+- Public: hero headline clamped, full-width CTAs, Subscribe always visible in the header, tuned
+  section rhythm, marquees slowed on small screens + `prefers-reduced-motion`, responsive
+  `srcSet`/width-capped stock images (`lib/img.js`), `viewport-fit=cover`, theme-color.
+- Dashboard rebuilt: Plan / Shopping / Progress tabs; `DayPlan.jsx` = sticky Mon–Sun selector
+  defaulting to today, swipe + prev/next, day totals vs target, full-width meal cards.
+- `ShoppingList.jsx`: aisle grouping (`lib/aisles.js`), tick persistence per week in localStorage,
+  x/y progress, reset.
+- `ProfileIntakeModal.jsx`: 3-step bottom-sheet intake; `ProgressLog.jsx` mobile form + legible chart.
+- Admin: client list becomes tappable cards under md, scrollable tab bar, 48px actions; heavy CMS
+  editing stays a desktop job (Phase 2).
+- Regression suite: `backend/tests/test_cron_rotation.py` (13 tests).
+
+### Release status
+- GitHub `main` could NOT be pulled — this workspace has **no git remote configured**, so the owner's
+  merged tweaks must be brought in via the platform's GitHub integration (or re-applied here).
+- Preview verified healthy; the owner presses Deploy for apttrains.com.
+
+## P0/P1 Backlog (updated 2026-02)
+- P1: Bring in GitHub `main` tweaks (needs platform GitHub integration — no remote in pod)
+- P1: Scale RecipePage kcal/macros/ingredients to the client's day-scale
+- P1: Include daily targets on the downloadable PDF
+- P2 (Phase 2): PWA — installable, offline current week, weekly "new code + menu" reminders
+- P2 (Phase 2): Full admin CMS usable on a phone
+- P2 (Phase 2): Verified Resend sending domain so codes reach members directly
+- P2 (Phase 3): Progress photos, meal swapping / "cook tonight" mode, share-a-plan + referrals

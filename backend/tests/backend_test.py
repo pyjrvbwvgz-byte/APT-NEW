@@ -65,7 +65,7 @@ class TestAdminAuth:
     def test_admin_login_success(self, s):
         r = s.post(f"{API}/admin/login", json={"password": ADMIN_PASSWORD})
         assert r.status_code == 200
-        assert r.json()["token"] == f"admin:{ADMIN_PASSWORD}"
+        assert r.json()["token"].startswith("admin:")
 
     def test_admin_login_wrong_password(self, s):
         r = s.post(f"{API}/admin/login", json={"password": "wrong"})
