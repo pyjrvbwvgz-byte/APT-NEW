@@ -1,93 +1,24 @@
-"""Default editable content for the public site. Admin can override via /api/admin/site."""
-
+"""Default editable public-site copy. Admin overrides remain supported."""
 SITE_CONTENT_DEFAULTS = {
-    "announcement": "NO MORE EXCUSES · GET IN SHAPE",
-    "nav": {
-        "links": [
-            {"label": "Home", "href": "/"},
-            {"label": "Plans", "href": "/#plans"},
-            {"label": "Meals", "href": "/#meals"},
-            {"label": "About", "href": "/#about"},
-            {"label": "Portal", "href": "/auth"},
-        ]
-    },
-    "landing": {
-        "hero": {
-            "kicker": "FUEL YOUR AMBITION",
-            "title_prefix": "Eat Strong. Train",
-            "title_highlight": "Stronger",
-            "subtitle": "Optimize your performance with 28 weekly macro-calculated meal blueprints, complete with calorie breakdowns and prep times. Instant PDF downloads for kitchen execution, engineered directly from Abraham's training methodology.",
-            "bg_image_url": "https://images.pexels.com/photos/2338407/pexels-photo-2338407.jpeg",
-            "primary_cta": "Subscribe for €14.99/mo",
-            "secondary_cta": "Enter Client Code",
-        },
-        "stats": {
-            "kicker": "BY THE NUMBERS",
-            "title": "Precision Fuel for Performance",
-            "items": [
-                {"value": "28", "label": "Meals/Week"},
-                {"value": "€14.99", "label": "Monthly Rate"},
-                {"value": "99.9%", "label": "Generated Client Results"},
-                {"value": "100%", "label": "Macro Precision"},
-            ],
-        },
-        "features": {
-            "kicker": "ENGINEERED NUTRITION",
-            "title": "The APT System",
-            "items": [
-                {
-                    "kicker": "STRUCTURED EATING",
-                    "title": "28 Weekly Meal Rosters",
-                    "description": "Receive a complete blueprint for your week, removing all guesswork from your nutrition. Every meal is accounted for, aligning with your training goals.",
-                    "image_url": "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg",
-                    "shape": "circle",
-                },
-                {
-                    "kicker": "INSTANT ACCESS",
-                    "title": "Downloadable PDF Blueprints",
-                    "description": "Your weekly plan arrives as a detailed PDF, ready for immediate download. Print it, save it, or access it on your device for kitchen execution.",
-                    "image_url": "https://images.pexels.com/photos/4021983/pexels-photo-4021983.jpeg",
-                    "shape": "rounded",
-                },
-                {
-                    "kicker": "COACH INTEGRATION",
-                    "title": "Personal Coach Alignment",
-                    "description": "Existing Abraham's Personal Training clients unlock custom plans instantly with a 4-digit code, ensuring seamless integration with your 1:1 coaching.",
-                    "image_url": "https://images.pexels.com/photos/1552252/pexels-photo-1552252.jpeg",
-                    "shape": "skew",
-                },
-            ],
-        },
-        "how": {
-            "kicker": "EXECUTION FLOW",
-            "title": "Your Path to Caloric Precision",
-            "steps": [
-                {"n": "01", "t": "Pick Your Plan", "d": "Select the meal plan that aligns with your training intensity and dietary needs. Our system adjusts to you."},
-                {"n": "02", "t": "View Macro Metrics", "d": "Each meal comes with precise macro breakdowns and calorie counts, ensuring you hit your numbers every time."},
-                {"n": "03", "t": "Download PDF Blueprint", "d": "Receive your detailed weekly roster as an instant PDF. Your kitchen execution guide, ready for action."},
-                {"n": "04", "t": "Execute & Conquer", "d": "Follow your blueprint, eliminate guesswork, and focus on your training knowing your nutrition is dialed in."},
-            ],
-        },
-        "cta": {
-            "title": "Unlock Your Performance Fuel",
-            "subtitle": "Join APT today for €14.99/month, or enter your exclusive 4-digit client code for immediate access.",
-            "primary": "Subscribe Now",
-            "secondary": "Enter Client Code",
-        },
-    },
-    "footer": {
-        "brand": ".VPT WETRAIN",
-        "tagline": "28 macro-calculated weekly meals engineered for heavy lifting.",
-        "support_label": "Direct Support",
-        "support_email": "support@apttrains.com",
-        "lines": ["Client Code Portal Active", "Abraham's Personal Training Studio"],
-        "copyright": "Engineered by Abraham's Personal Training. €14.99/mo.",
-        "strapline": "28 MEALS · MACROS BUILT IN · PDF BLUEPRINTS",
-    },
-    "extras": [],  # list of {title, caption, image_url} cards
+    'announcement': 'Weekly meal plans, made doable. Your next week of food is already thought through.',
+    'nav': {'links': [{'label': 'Home', 'href': '/'}, {'label': 'Plans', 'href': '/#plans'}, {'label': 'Meals', 'href': '/#meals'}, {'label': 'About', 'href': '/#about'}, {'label': 'Client code', 'href': '/auth'}]},
+    'landing': {
+        'hero': {'kicker': 'A calmer kind of meal prep', 'title_prefix': 'No more stress.', 'title_highlight': 'Just eat.', 'subtitle': 'Make your week feel easier with a practical macro meal plan, made for real life and ready to take to the kitchen.', 'bg_image_url': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1400&q=85', 'primary_cta': 'Get your weekly plan', 'secondary_cta': 'Enter client code'},
+        # Preserve the admin content schema, but never display unverified outcome statistics.
+        'stats': {'kicker': 'What is included', 'title': 'Your week, made easier', 'items': []},
+        'features': {'kicker': 'A plan that works harder', 'title': 'Good food, with the thinking done.', 'items': [
+            {'kicker': 'Meal ideas', 'title': '28 weekly meals', 'description': 'Plenty of choices to make the menu feel flexible.', 'image_url': 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&q=85', 'shape': 'rounded'},
+            {'kicker': 'The details', 'title': 'Macros alongside every meal', 'description': 'See the numbers so you can make informed choices.', 'image_url': '', 'shape': 'rounded'},
+            {'kicker': 'Take it with you', 'title': 'A downloadable PDF and shopping list', 'description': 'Keep the plan close in the kitchen or at the shop.', 'image_url': '', 'shape': 'rounded'}]},
+        'how': {'kicker': 'Four easy steps', 'title': 'Less planning. More getting on with it.', 'steps': [
+            {'n': '01', 't': 'Choose your plan', 'd': 'Subscribe for €14.99 a month and get the latest weekly plan.'},
+            {'n': '02', 't': 'Find your meals', 'd': 'Explore meal ideas with macros to suit your routine.'},
+            {'n': '03', 't': 'Download the PDF', 'd': 'Take your weekly meals and shopping list into the kitchen.'},
+            {'n': '04', 't': 'Make it your week', 'd': 'Pick what works for you, prep what you can, and enjoy more headspace.'}]},
+        'cta': {'title': 'Make one less decision this week.', 'subtitle': '28 meals, macros and a shopping list, all in one downloadable weekly plan. €14.99 per month.', 'primary': 'Subscribe for €14.99 / month', 'secondary': 'Enter client code'}},
+    'footer': {'brand': "Abraham's Personal Training", 'tagline': 'Weekly meal plans made practical.', 'support_label': 'Support', 'support_email': 'support@apttrains.com', 'lines': ["Abraham's Personal Training"], 'copyright': "Abraham's Personal Training", 'strapline': ''},
+    'extras': [],
 }
-
-
 def deep_merge(defaults, override):
     """Merge override into defaults non-destructively. Lists are replaced."""
     if not isinstance(defaults, dict) or not isinstance(override, dict):
