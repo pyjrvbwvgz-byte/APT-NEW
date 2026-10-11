@@ -1,3 +1,12 @@
-.App {
-    min-height: 100vh;
-}
+/* Light-touch palette bridge for existing subscription and client-code flows. Keeps all forms, handlers and routes intact. */
+.App { text-align: center; }
+[class*='bg-[#0c0d10]'] { background-color: #f7f5ec !important; color: #193127; }
+[class*='bg-[#0c0d10]'] main [class*='text-white'] { color: #193127; }
+[class*='bg-[#0c0d10]'] main [class*='text-white/'] { color: #5c6b60; }
+[class*='bg-[#0c0d10]'] main [class*='text-[#38bdf8]'] { color: #087849; }
+[class*='bg-[#0c0d10]'] main [class*='bg-[#38bdf8]'] { background-color: #087849; color: white; border-radius: 4px; }
+[class*='bg-[#0c0d10]'] main [class*='bg-[#15161a]'], [class*='bg-[#0c0d10]'] main [class*='bg-[#101216]'] { background-color: #fffdf7; border-color: #d9dfd1; }
+[class*='bg-[#0c0d10]'] main input:not([type='checkbox']) { background: #fffdf7; color: #193127; border-color: #aebfae; }
+[class*='bg-[#0c0d10]'] main input::placeholder { color: #5c6b60; }
+[class*='bg-[#0c0d10]'] main h1, [class*='bg-[#0c0d10]'] main h2 { text-transform: none; }
+[class*='bg-[#0c0d10]'] main .font-serif-accent { font-family: 'DM Sans', Arial, sans-serif; font-style: normal; }
