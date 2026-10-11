@@ -37,6 +37,7 @@ export default function OTPInput({ value, onChange, length = 4 }) {
           key={i}
           ref={(el) => (refs.current[i] = el)}
           inputMode="numeric"
+          autoComplete="one-time-code"
           maxLength={1}
           value={value[i] || ""}
           onChange={(e) => handleChange(i, e.target.value)}

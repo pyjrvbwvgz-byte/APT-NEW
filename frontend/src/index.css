@@ -122,6 +122,45 @@ h1, h2, h3, h4, h5, h6, .font-display {
     text-wrap: balance;
 }
 
+/* Hide scrollbars on horizontal pickers (day selector, chips) */
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+html {
+    scroll-behavior: smooth;
+    /* anchors land below the sticky header */
+    scroll-padding-top: 90px;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+}
+
+/* Calm the marquees down on phones so they never hijack a swipe */
+@media (max-width: 640px) {
+    .marquee-track {
+        animation-duration: 40s;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .marquee-track {
+        animation: none;
+    }
+    .rise-in {
+        animation: none;
+    }
+    html {
+        scroll-behavior: auto;
+    }
+}
+
 .grain {
     position: relative;
 }

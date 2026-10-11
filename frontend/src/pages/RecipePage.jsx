@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { Header, Footer } from "../components/Layout";
 import { Badge } from "../components/ui/badge";
 import { ArrowLeft, Clock, Users } from "lucide-react";
+import { imgUrl, imgSrcSet } from "../lib/img";
 
 export default function RecipePage() {
   const { slug } = useParams();
@@ -20,7 +21,7 @@ export default function RecipePage() {
   return (
     <div className="min-h-screen flex flex-col theme-light">
       <Header />
-      <main className="flex-1 py-10">
+      <main className="flex-1 py-6 sm:py-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link
             to="/dashboard"
@@ -35,20 +36,22 @@ export default function RecipePage() {
           ) : !recipe ? (
             <div className="text-[#5C7063]">Recipe not found.</div>
           ) : (
-            <div className="grid lg:grid-cols-12 gap-10">
+            <div className="grid lg:grid-cols-12 gap-8 lg:gap-10">
               <div className="lg:col-span-7">
                 <div className="rounded-2xl overflow-hidden border border-[#E5EFE8]">
                   <img
-                    src={recipe.image_url}
+                    src={imgUrl(recipe.image_url, 1000)}
+                    srcSet={imgSrcSet(recipe.image_url, [520, 800, 1200])}
+                    sizes="(max-width: 1024px) 100vw, 60vw"
                     alt={recipe.name}
-                    className="w-full h-[420px] object-cover"
+                    className="w-full h-56 sm:h-80 lg:h-[420px] object-cover"
                   />
                 </div>
                 <div className="mt-8">
                   <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">
                     {recipe.category}
                   </div>
-                  <h1 className="font-display text-4xl lg:text-5xl font-bold text-[#111C15] tracking-tight mt-3">
+                  <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl font-bold text-[#111C15] tracking-tight mt-2">
                     {recipe.name}
                   </h1>
                   <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-[#5C7063]">
@@ -73,7 +76,7 @@ export default function RecipePage() {
 
                   {recipe.macros && (
                     <div
-                      className="mt-6 grid grid-cols-4 gap-3"
+                      className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3"
                       data-testid="recipe-macros"
                     >
                       {[
@@ -105,7 +108,7 @@ export default function RecipePage() {
                     </div>
                   )}
 
-                  <h2 className="mt-10 font-display text-2xl font-semibold text-[#111C15]">
+                  <h2 className="mt-10 font-display text-xl sm:text-2xl font-semibold text-[#111C15]">
                     Instructions
                   </h2>
                   <ol className="mt-4 space-y-4">
@@ -124,8 +127,8 @@ export default function RecipePage() {
               </div>
 
               <aside className="lg:col-span-5">
-                <div className="bg-white border border-[#E5EFE8] rounded-2xl p-6 lg:sticky lg:top-24">
-                  <h2 className="font-display text-2xl font-semibold text-[#111C15]">
+                <div className="bg-white border border-[#E5EFE8] rounded-2xl p-5 sm:p-6 lg:sticky lg:top-24">
+                  <h2 className="font-display text-xl sm:text-2xl font-semibold text-[#111C15]">
                     Ingredients
                   </h2>
                   <div className="text-xs uppercase tracking-[0.18em] text-[#5C7063] mt-1">
@@ -135,7 +138,7 @@ export default function RecipePage() {
                     {recipe.ingredients.map((ing, i) => (
                       <li
                         key={i}
-                        className="flex items-center justify-between py-2 border-b border-[#F3F7F4] last:border-0"
+                        className="flex items-center justify-between gap-3 py-3 border-b border-[#F3F7F4] last:border-0"
                         data-testid={`recipe-ingredient-${i}`}
                       >
                         <span className="text-[#111C15]">{ing.name}</span>

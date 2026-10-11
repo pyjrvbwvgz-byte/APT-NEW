@@ -27,7 +27,7 @@ export default function SubscribePage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0c0d10]">
       <Header />
-      <main className="flex-1 py-16 lg:py-24">
+      <main className="flex-1 py-12 sm:py-16 lg:py-24">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10 grid gap-12 lg:grid-cols-12 lg:gap-16 items-start">
           {/* Left */}
           <div className="lg:col-span-7">
@@ -44,13 +44,13 @@ export default function SubscribePage() {
                 Monthly subscription
               </span>
             </div>
-            <h1 className="mt-6 font-display text-5xl font-bold uppercase leading-[0.9] tracking-tight text-white lg:text-7xl">
+            <h1 className="mt-6 font-display text-[2.75rem] font-bold uppercase leading-[0.95] tracking-tight text-white sm:text-5xl lg:text-7xl">
               €14.99
               <span className="block font-serif-accent normal-case italic text-[#38bdf8]">
                 per month
               </span>
             </h1>
-            <p className="mt-7 max-w-lg text-base leading-relaxed text-white/50">
+            <p className="mt-6 max-w-lg text-[15px] leading-relaxed text-white/55 sm:text-base">
               Full access to weekly meal plans, recipes with macros, the auto shopping list and PDF
               download. Cancel anytime.
             </p>
@@ -64,7 +64,7 @@ export default function SubscribePage() {
               </div>
             )}
 
-            <div className="mt-10 rounded-[1.5rem] border border-white/10 bg-[#15161a] p-7">
+            <div className="mt-8 rounded-[1.5rem] border border-white/10 bg-[#15161a] p-5 sm:p-7">
               <a
                 href={paymentLink || "#"}
                 target={paymentLink ? "_self" : "_blank"}
@@ -106,7 +106,7 @@ export default function SubscribePage() {
           </div>
 
           {/* Right */}
-          <div className="lg:col-span-5 rounded-[1.5rem] border border-white/10 bg-[#101216] p-8 lg:sticky lg:top-28">
+          <div className="lg:col-span-5 rounded-[1.5rem] border border-white/10 bg-[#101216] p-6 sm:p-8 lg:sticky lg:top-28">
             <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">
               What's included
             </div>

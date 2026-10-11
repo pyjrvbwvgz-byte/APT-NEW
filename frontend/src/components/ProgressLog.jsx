@@ -104,17 +104,17 @@ export default function ProgressLog({ client, onWeightChange }) {
   const goalWeight = null; // free-form; no target weight field
 
   return (
-    <section className="mb-16" data-testid="progress-log">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <section data-testid="progress-log">
+      <div className="flex items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-2">
           <LineIcon className="w-5 h-5 text-[#10B981]" />
-          <h2 className="font-display text-2xl font-semibold text-[#111C15]">
+          <h2 className="font-display text-xl sm:text-2xl font-semibold text-[#111C15]">
             Progress log
           </h2>
         </div>
         <Button
           onClick={() => { setShowForm((s) => !s); setWeight(client?.profile?.weight_kg || ""); setDate(todayISO()); }}
-          className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md"
+          className="h-11 bg-[#10B981] hover:bg-[#059669] text-white"
           data-testid="log-weight-btn"
         >
           <Plus className="w-4 h-4 mr-1.5" /> Log weight
@@ -124,53 +124,67 @@ export default function ProgressLog({ client, onWeightChange }) {
       {showForm && (
         <form
           onSubmit={submit}
-          className="bg-white border border-[#E5EFE8] rounded-2xl p-5 mb-6 grid md:grid-cols-4 gap-4 items-end"
+          className="bg-white border border-[#E5EFE8] rounded-2xl p-4 sm:p-5 mb-6 grid gap-4 sm:grid-cols-2"
           data-testid="weigh-in-form"
         >
           <div>
-            <Label htmlFor="wl-date">Date</Label>
+            <Label htmlFor="wl-weight" className="text-xs uppercase tracking-wider text-[#5C7063]">
+              Weight (kg)
+            </Label>
+            <Input
+              id="wl-weight"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min={30}
+              max={300}
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              className="mt-1.5 h-12 text-lg font-semibold tabular-nums"
+              data-testid="weigh-in-weight"
+              autoFocus
+            />
+          </div>
+          <div>
+            <Label htmlFor="wl-date" className="text-xs uppercase tracking-wider text-[#5C7063]">
+              Date
+            </Label>
             <Input
               id="wl-date"
               type="date"
               value={date}
               max={todayISO()}
               onChange={(e) => setDate(e.target.value)}
-              className="mt-1.5"
+              className="mt-1.5 h-12"
               data-testid="weigh-in-date"
             />
           </div>
-          <div>
-            <Label htmlFor="wl-weight">Weight (kg)</Label>
-            <Input
-              id="wl-weight"
-              type="number"
-              step="0.1"
-              min={30}
-              max={300}
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="mt-1.5"
-              data-testid="weigh-in-weight"
-              autoFocus
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Label htmlFor="wl-note">Note (optional)</Label>
+          <div className="sm:col-span-2">
+            <Label htmlFor="wl-note" className="text-xs uppercase tracking-wider text-[#5C7063]">
+              Note (optional)
+            </Label>
             <Input
               id="wl-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. after 3 gym sessions"
-              className="mt-1.5"
+              className="mt-1.5 h-12"
               data-testid="weigh-in-note"
             />
           </div>
-          <div className="md:col-span-4 flex gap-3 justify-end">
-            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          <div className="sm:col-span-2 grid grid-cols-2 gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 border-[#E5EFE8]"
+              onClick={() => setShowForm(false)}
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
               disabled={saving}
-              className="bg-[#10B981] hover:bg-[#059669] text-white"
+              className="h-12 bg-[#10B981] hover:bg-[#059669] text-white font-semibold"
               data-testid="save-weigh-in-btn"
             >
               {saving ? "Saving…" : "Save entry"}
@@ -179,7 +193,7 @@ export default function ProgressLog({ client, onWeightChange }) {
         </form>
       )}
 
-      <div className="bg-white border border-[#E5EFE8] rounded-2xl p-6 lg:p-8">
+      <div className="bg-white border border-[#E5EFE8] rounded-2xl p-4 sm:p-6">
         {loading ? (
           <div className="text-[#5C7063]">Loading…</div>
         ) : entries.length === 0 ? (
@@ -230,17 +244,24 @@ export default function ProgressLog({ client, onWeightChange }) {
 
             {/* Chart */}
             {chartData.length >= 2 && (
-              <div className="h-56 -mx-2" data-testid="progress-chart">
+              <div className="h-52 sm:h-56 -mx-3 sm:-mx-2" data-testid="progress-chart">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+                  <LineChart data={chartData} margin={{ top: 8, right: 14, bottom: 4, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5EFE8" />
-                    <XAxis dataKey="label" fontSize={11} stroke="#5C7063" />
+                    <XAxis
+                      dataKey="label"
+                      fontSize={10}
+                      stroke="#5C7063"
+                      interval="preserveStartEnd"
+                      minTickGap={18}
+                      tickMargin={6}
+                    />
                     <YAxis
                       domain={["auto", "auto"]}
-                      fontSize={11}
+                      fontSize={10}
                       stroke="#5C7063"
-                      unit=" kg"
-                      width={60}
+                      width={34}
+                      tickCount={4}
                     />
                     <Tooltip
                       formatter={(v) => [`${v} kg`, "Weight"]}
@@ -269,21 +290,24 @@ export default function ProgressLog({ client, onWeightChange }) {
                 {[...entries].reverse().slice(0, 10).map((e) => (
                   <div
                     key={e.id}
-                    className="flex items-center justify-between py-2 border-b border-[#F3F7F4] last:border-0"
+                    className="flex items-center justify-between gap-2 py-3 border-b border-[#F3F7F4] last:border-0"
                     data-testid={`weigh-in-row-${e.id}`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="font-mono text-xs text-[#5C7063] w-20">{fmtDate(e.date)}</div>
-                      <div className="font-medium text-[#111C15] tabular-nums">{e.weight_kg} kg</div>
-                      {e.note && <div className="text-xs text-[#5C7063] italic">{e.note}</div>}
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="font-mono text-xs text-[#5C7063] w-16 flex-none">{fmtDate(e.date)}</div>
+                      <div className="font-semibold text-[#111C15] tabular-nums flex-none">{e.weight_kg} kg</div>
+                      {e.note && (
+                        <div className="text-xs text-[#5C7063] italic truncate">{e.note}</div>
+                      )}
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-10 w-10 p-0 flex-none"
                       onClick={() => remove(e.id)}
                       data-testid={`delete-weigh-in-${e.id}`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 ))}

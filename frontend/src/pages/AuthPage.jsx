@@ -38,7 +38,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0c0d10]">
       <Header />
-      <main className="flex-1 py-16 lg:py-24">
+      <main className="flex-1 py-12 sm:py-16 lg:py-24">
         <div className="max-w-md mx-auto px-4">
           <div className="mb-10">
             <div className="flex items-center gap-3">
@@ -47,15 +47,15 @@ export default function AuthPage() {
                 Coaching clients
               </span>
             </div>
-            <h1 className="mt-6 font-display text-4xl font-bold uppercase leading-[0.95] tracking-tight text-white lg:text-5xl">
+            <h1 className="mt-6 font-display text-[2rem] font-bold uppercase leading-[1] tracking-tight text-white sm:text-4xl lg:text-5xl">
               Enter your code
             </h1>
             <p className="mt-4 text-sm leading-relaxed text-white/50">
-              Your APT coach sends a fresh 4-digit code every Monday.
+              Fresh 4-digit codes are issued every Sunday at 6am.
             </p>
           </div>
 
-          <div className="rounded-[1.5rem] border border-white/10 bg-[#15161a] p-7">
+          <div className="rounded-[1.5rem] border border-white/10 bg-[#15161a] p-5 sm:p-7">
             <form onSubmit={onLogin} className="space-y-6">
               <div>
                 <Label
@@ -71,7 +71,7 @@ export default function AuthPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   data-testid="login-email-input"
-                  className="mt-2 h-12 border-white/15 bg-[#0c0d10] text-white placeholder:text-white/25"
+                  className="mt-2 h-12 border-white/15 bg-[#0c0d10] text-base text-white placeholder:text-white/25"
                 />
               </div>
               <div>

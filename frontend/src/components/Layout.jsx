@@ -57,7 +57,7 @@ export function Header({ right, marketing = false }) {
           )}
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:flex items-center gap-3">{right}</div>
+            <div className="flex items-center gap-2 sm:gap-3">{right}</div>
             {links.length > 0 && (
               <button
                 onClick={() => setOpen((v) => !v)}
@@ -78,13 +78,12 @@ export function Header({ right, marketing = false }) {
                 key={l.label}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="block text-sm font-semibold uppercase tracking-[0.18em] text-white/70"
+                className="block py-2 text-sm font-semibold uppercase tracking-[0.18em] text-white/70"
                 data-testid={`mobile-nav-link-${l.label.toLowerCase()}`}
               >
                 {l.label}
               </a>
             ))}
-            <div className="flex flex-col gap-3 pt-2">{right}</div>
           </div>
         )}
       </header>

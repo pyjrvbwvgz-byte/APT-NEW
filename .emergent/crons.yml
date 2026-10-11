@@ -1,0 +1,9 @@
+crons:
+  - name: weekly-codes
+    description: "Issues fresh 4-digit access codes every Sunday 06:00 Irish time and emails the coach the digest"
+    cron: "0 6 * * 0"
+    timezone: "Europe/Dublin"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/rotate-codes"
+    method: POST
+    enabled: true

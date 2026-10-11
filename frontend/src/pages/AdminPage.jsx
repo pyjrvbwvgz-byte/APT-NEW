@@ -23,11 +23,12 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, Mail, CreditCard, Users, Calendar, Salad, Layout, Utensils, User } from "lucide-react";
+import { ShieldCheck, RefreshCw, Trash2, Save, LogOut, UserPlus, CreditCard, Users, Calendar, Salad, Layout, Utensils, User } from "lucide-react";
 import AdminMealsTab from "./admin/AdminMealsTab";
 import AdminContentTab from "./admin/AdminContentTab";
 import ClientMenuEditor from "./admin/ClientMenuEditor";
 import ClientProfileView from "./admin/ClientProfileView";
+import CodeStatusPanel from "./admin/CodeStatusPanel";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -260,41 +261,31 @@ function AdminDashboard({ onLogout }) {
           </Button>
         }
       />
-      <main className="flex-1 py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-[#10B981] font-medium">
-                Admin
-              </div>
-              <h1 className="font-display text-4xl font-bold text-[#111C15] tracking-tight mt-2">
-                Control panel
-              </h1>
+      <main className="flex-1 py-6 sm:py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#10B981]">
+              Admin
             </div>
-            <Button
-              onClick={rotateAll}
-              disabled={rotating}
-              variant="outline"
-              className="border-[#E5EFE8] hover:bg-[#F3F7F4]"
-              data-testid="rotate-codes-btn"
-            >
-              <Mail className="w-4 h-4 mr-2" />
-              {rotating ? "Rotating…" : "Rotate weekly codes & email digest"}
-            </Button>
+            <h1 className="font-display text-2xl sm:text-4xl font-bold text-[#111C15] tracking-tight mt-1.5">
+              Control panel
+            </h1>
           </div>
 
+          <CodeStatusPanel onRotate={rotateAll} rotating={rotating} />
+
           <Tabs defaultValue="clients" className="space-y-6">
-            <TabsList className="bg-[#F3F7F4] flex-wrap h-auto">
-              <TabsTrigger value="clients" data-testid="tab-clients">
+            <TabsList className="bg-[#F3F7F4] flex w-full justify-start gap-1 overflow-x-auto no-scrollbar h-auto p-1">
+              <TabsTrigger value="clients" data-testid="tab-clients" className="flex-none px-3 py-2">
                 <Users className="w-4 h-4 mr-1" /> Clients
               </TabsTrigger>
-              <TabsTrigger value="menu" data-testid="tab-menu">
+              <TabsTrigger value="menu" data-testid="tab-menu" className="flex-none px-3 py-2">
                 <Calendar className="w-4 h-4 mr-1" /> Weekly menu
               </TabsTrigger>
-              <TabsTrigger value="meals" data-testid="tab-meals">
+              <TabsTrigger value="meals" data-testid="tab-meals" className="flex-none px-3 py-2">
                 <Salad className="w-4 h-4 mr-1" /> Meals
               </TabsTrigger>
-              <TabsTrigger value="content" data-testid="tab-content">
+              <TabsTrigger value="content" data-testid="tab-content" className="flex-none px-3 py-2">
                 <Layout className="w-4 h-4 mr-1" /> Website
               </TabsTrigger>
             </TabsList>
@@ -358,12 +349,12 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
       )}
           {/* Create coaching client */}
           <section>
-            <h2 className="font-display text-2xl font-semibold text-[#111C15] mb-4">
+            <h2 className="font-display text-xl sm:text-2xl font-semibold text-[#111C15] mb-4">
               Add coaching client
             </h2>
             <form
               onSubmit={createClient}
-              className="bg-white border border-[#E5EFE8] rounded-2xl p-6 flex flex-col md:flex-row gap-4 items-end"
+              className="bg-white border border-[#E5EFE8] rounded-2xl p-4 sm:p-6 flex flex-col md:flex-row gap-4 md:items-end"
             >
               <div className="flex-1 w-full">
                 <Label htmlFor="new-name">Name</Label>
@@ -391,7 +382,7 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
               <Button
                 type="submit"
                 disabled={creating}
-                className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-11 px-6"
+                className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 w-full md:w-auto px-6"
                 data-testid="create-client-btn"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
@@ -399,21 +390,95 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
               </Button>
             </form>
             <p className="text-xs text-[#5C7063] mt-2">
-              A 4-digit code is generated and emailed to your inbox so you can pass it on. Codes rotate every Monday.
+              A 4-digit code is generated and emailed to your inbox so you can pass it on. Codes renew every Sunday at 6am.
             </p>
           </section>
 
           {/* Clients table */}
           <section>
-            <h2 className="font-display text-2xl font-semibold text-[#111C15] mb-4">
+            <h2 className="font-display text-xl sm:text-2xl font-semibold text-[#111C15] mb-4">
               Clients ({clients.length})
             </h2>
-            <div className="bg-white border border-[#E5EFE8] rounded-2xl overflow-x-auto">
-              {loading ? (
-                <div className="p-6 text-[#5C7063]">Loading…</div>
-              ) : clients.length === 0 ? (
-                <div className="p-6 text-[#5C7063]">No clients yet.</div>
-              ) : (
+            {loading ? (
+              <div className="bg-white border border-[#E5EFE8] rounded-2xl p-6 text-[#5C7063]">Loading…</div>
+            ) : clients.length === 0 ? (
+              <div className="bg-white border border-[#E5EFE8] rounded-2xl p-6 text-[#5C7063]">No clients yet.</div>
+            ) : (
+              <>
+              {/* Phone: cards */}
+              <div className="space-y-3 md:hidden">
+                {clients.map((c) => (
+                  <div
+                    key={c.id}
+                    className="bg-white border border-[#E5EFE8] rounded-2xl p-4"
+                    data-testid={`client-card-${c.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[#111C15] truncate">{c.name}</div>
+                        <div className="text-xs text-[#5C7063] truncate">{c.email}</div>
+                      </div>
+                      {c.is_subscribed ? (
+                        <Badge className="bg-[#10B981] text-white flex-none">
+                          <CreditCard className="w-3 h-3 mr-1" /> Sub
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-[#E5EFE8] text-[#5C7063] flex-none">
+                          Coaching
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[#F3F7F4]/70 px-3 py-2.5">
+                      <span className="font-display text-xl font-bold tracking-[0.18em] text-[#059669] tabular-nums">
+                        {c.code || "—"}
+                      </span>
+                      <span className="text-xs text-[#5C7063]">
+                        until{" "}
+                        {c.code_expires_at
+                          ? new Date(c.code_expires_at).toLocaleDateString()
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setProfileFor(c)}
+                        className="h-11 border-[#E5EFE8]"
+                        data-testid={`profile-m-${c.id}`}
+                      >
+                        <User className="w-4 h-4 mr-1.5" /> Profile
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setMenuEditFor(c)}
+                        className="h-11 border-[#10B981]/40 text-[#059669]"
+                        data-testid={`meals-m-${c.id}`}
+                      >
+                        <Utensils className="w-4 h-4 mr-1.5" /> Meals
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => regenCode(c.id)}
+                        className="h-11 border-[#E5EFE8]"
+                        data-testid={`regen-m-${c.id}`}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-1.5" /> New code
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => removeClient(c.id)}
+                        className="h-11"
+                        data-testid={`remove-m-${c.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1.5" /> Remove
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop: table */}
+              <div className="hidden md:block bg-white border border-[#E5EFE8] rounded-2xl overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -479,16 +544,14 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
                           >
                             <Utensils className="w-3.5 h-3.5 mr-1" /> Meals
                           </Button>
-                          {!c.is_subscribed && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => regenCode(c.id)}
-                              data-testid={`regen-${c.id}`}
-                            >
-                              <RefreshCw className="w-3.5 h-3.5 mr-1" /> Code
-                            </Button>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => regenCode(c.id)}
+                            data-testid={`regen-${c.id}`}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Code
+                          </Button>
                           <Button
                             variant="destructive"
                             size="sm"
@@ -502,8 +565,9 @@ function ClientsSection({ clients, loading, newName, newEmail, setNewName, setNe
                     ))}
                   </TableBody>
                 </Table>
-              )}
-            </div>
+              </div>
+              </>
+            )}
           </section>
     </>
   );
@@ -513,13 +577,13 @@ function MenuSection({ menu, recipes, updateMenuSlot, saveMenu, byCategory }) {
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return (
     <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-2xl font-semibold text-[#111C15]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <h2 className="font-display text-xl sm:text-2xl font-semibold text-[#111C15]">
                 This week's menu
               </h2>
               <Button
                 onClick={saveMenu}
-                className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md"
+                className="bg-[#10B981] hover:bg-[#059669] text-white rounded-md h-12 w-full sm:w-auto"
                 data-testid="save-menu-btn"
               >
                 <Save className="w-4 h-4 mr-2" /> Save & apply to all clients

@@ -46,9 +46,9 @@ export default function SubscribeSuccessPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0c0d10]">
       <Header />
-      <main className="flex-1 py-20">
+      <main className="flex-1 py-12 sm:py-20">
         <div className="max-w-lg mx-auto px-4">
-          <div className="rounded-[1.75rem] border border-white/10 bg-[#15161a] p-9 text-center">
+          <div className="rounded-[1.75rem] border border-white/10 bg-[#15161a] p-6 sm:p-9 text-center">
             {activated ? (
               <>
                 <CheckCircle2 className="mx-auto h-14 w-14 text-[#38bdf8]" />
@@ -89,7 +89,7 @@ export default function SubscribeSuccessPage() {
                     placeholder="you@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="mt-2 h-12 border-white/15 bg-[#0c0d10] text-white placeholder:text-white/25"
+                    className="mt-2 h-12 border-white/15 bg-[#0c0d10] text-base text-white placeholder:text-white/25"
                     data-testid="activate-email-input"
                   />
                 </div>

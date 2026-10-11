@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -60,6 +61,9 @@ ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_NOTIFY_EMAIL', 'abpt@apttrains.com')
 ADMIN_SESSION_HOURS = 8
 WEBHOOK_CRON_SECRET = os.environ.get('WEBHOOK_CRON_SECRET')
 
+# Weekly 4-digit codes are issued every Sunday 06:00 Irish time and run for a full week.
+CODE_TZ = ZoneInfo('Europe/Dublin')
+
 # Single product: monthly access (€14.99). Defined server-side ONLY.
 SUBSCRIPTION_PRICE = 14.99
 SUBSCRIPTION_CURRENCY = "eur"
@@ -79,17 +83,26 @@ def week_start() -> datetime:
     monday = t.date() - timedelta(days=t.weekday())
     return datetime(monday.year, monday.month, monday.day, tzinfo=timezone.utc)
 
-def next_monday() -> datetime:
-    """Returns next Monday 00:00 UTC."""
-    t = now_utc()
-    days_ahead = (7 - t.weekday()) % 7
-    if days_ahead == 0:
-        days_ahead = 7
-    nm = (t.date() + timedelta(days=days_ahead))
-    return datetime(nm.year, nm.month, nm.day, tzinfo=timezone.utc)
+def _dublin_anchor(d) -> datetime:
+    """06:00 Europe/Dublin on date `d`, returned as an aware UTC datetime."""
+    return datetime(d.year, d.month, d.day, 6, 0, tzinfo=CODE_TZ).astimezone(timezone.utc)
+
+def code_week_start() -> datetime:
+    """Start of the current code week — the most recent Sunday 06:00 Europe/Dublin."""
+    today = now_utc().astimezone(CODE_TZ).date()
+    sunday = today - timedelta(days=(today.weekday() + 1) % 7)
+    anchor = _dublin_anchor(sunday)
+    if anchor > now_utc():
+        anchor = _dublin_anchor(sunday - timedelta(days=7))
+    return anchor
+
+def next_code_expiry() -> datetime:
+    """End of the current code week — next Sunday 06:00 Europe/Dublin."""
+    start_local = code_week_start().astimezone(CODE_TZ).date()
+    return _dublin_anchor(start_local + timedelta(days=7))
 
 def fmt_expiry(dt: datetime) -> str:
-    return dt.strftime("%a %d %b %Y")
+    return dt.astimezone(CODE_TZ).strftime("%a %d %b %Y, %H:%M")
 
 def has_active_subscription(c: dict) -> bool:
     if not c.get("subscription_expires_at"):
@@ -180,17 +193,35 @@ async def startup_seed():
     # admin opens the clients list, so a missed fire self-heals.
 
 
+def eligible_for_weekly_code(c: dict) -> bool:
+    """Coaching clients always get a weekly code. Subscriber-created accounts get
+    one too, but only while their subscription is live."""
+    if c.get("active") is False:
+        return False
+    if c.get("source") == "stripe" and not has_active_subscription(c):
+        return False
+    return True
+
+async def issue_code(client_id: str) -> dict:
+    """Gives a client a fresh code for the current code week."""
+    new_code = gen_code()
+    new_exp = next_code_expiry().isoformat()
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"code": new_code, "code_expires_at": new_exp}},
+    )
+    return {"code": new_code, "code_expires_at": new_exp}
+
 async def maybe_rotate_codes(force: bool = False) -> Optional[List[dict]]:
-    ws_iso = week_start().isoformat()
+    ws_iso = code_week_start().isoformat()
     marker = await db.system.find_one({"key": "last_code_rotation"}, {"_id": 0})
     if not force and marker and marker.get("week_start") == ws_iso:
-        return None  # already rotated this week
-    # Only rotate for active non-subscribed clients
+        return None  # already rotated this code week
     clients = await db.clients.find({"active": {"$ne": False}}, {"_id": 0}).to_list(2000)
     rotated = []
-    new_exp = next_monday().isoformat()
+    new_exp = next_code_expiry().isoformat()
     for c in clients:
-        if has_active_subscription(c):
+        if not eligible_for_weekly_code(c):
             continue
         new_code = gen_code()
         await db.clients.update_one(
@@ -205,7 +236,7 @@ async def maybe_rotate_codes(force: bool = False) -> Optional[List[dict]]:
     )
     if rotated:
         try:
-            await send_admin_digest(ADMIN_NOTIFY_EMAIL, rotated, fmt_expiry(next_monday()))
+            await send_admin_digest(ADMIN_NOTIFY_EMAIL, rotated, fmt_expiry(next_code_expiry()))
         except Exception as e:
             logger.warning("admin digest email failed: %s", e)
     return rotated
@@ -459,6 +490,7 @@ async def create_checkout(payload: CheckoutIn, request: Request):
             "email": email,
             "created_at": now_utc().isoformat(),
             "active": True,
+            "source": "stripe",
             "code": None,
             "code_expires_at": None,
         })
@@ -630,6 +662,7 @@ async def _handle_checkout_completed(session: dict):
             "email": email,
             "created_at": now_utc().isoformat(),
             "active": True,
+            "source": "stripe",
             "code": None,
             "code_expires_at": None,
         })
@@ -648,6 +681,16 @@ async def _handle_checkout_completed(session: dict):
             "active": True,
         }},
     )
+    # Subscribers get a 4-digit code too — a convenience alongside their token
+    fresh = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not has_valid_code(fresh or {}):
+        issued = await issue_code(client_id)
+        try:
+            await send_code_email(
+                ADMIN_NOTIFY_EMAIL, name, issued["code"], fmt_expiry(next_code_expiry())
+            )
+        except Exception as e:
+            logger.warning("subscriber code email failed: %s", e)
     # Persist transaction
     await db.payment_transactions.insert_one({
         "id": str(uuid.uuid4()),
@@ -868,7 +911,7 @@ async def admin_ping(_: bool = Depends(require_admin)):
 
 @api_router.get("/admin/clients")
 async def admin_clients(_: bool = Depends(require_admin)):
-    # auto-rotate codes if Monday hit
+    # catch-up: if the Sunday schedule was missed, bring this week's codes up to date
     try:
         await maybe_rotate_codes()
     except Exception as e:
@@ -888,7 +931,7 @@ async def admin_create_client(payload: AdminCreateClientIn, _: bool = Depends(re
     if existing:
         raise HTTPException(status_code=400, detail="Email already exists")
     code = gen_code()
-    new_exp = next_monday().isoformat()
+    new_exp = next_code_expiry().isoformat()
     c = {
         "id": str(uuid.uuid4()),
         "name": payload.name.strip(),
@@ -897,11 +940,12 @@ async def admin_create_client(payload: AdminCreateClientIn, _: bool = Depends(re
         "code_expires_at": new_exp,
         "created_at": now_utc().isoformat(),
         "active": True,
+        "source": "admin",
     }
     await db.clients.insert_one(c)
     # email admin (not the client) so admin can share with them
     try:
-        await send_code_email(ADMIN_NOTIFY_EMAIL, c["name"], code, fmt_expiry(next_monday()))
+        await send_code_email(ADMIN_NOTIFY_EMAIL, c["name"], code, fmt_expiry(next_code_expiry()))
     except Exception as e:
         logger.warning("admin email failed: %s", e)
     return client_public(c)
@@ -916,7 +960,7 @@ async def admin_remove_client(client_id: str, _: bool = Depends(require_admin)):
 @api_router.post("/admin/clients/{client_id}/regenerate-code")
 async def admin_regen_code(client_id: str, _: bool = Depends(require_admin)):
     new_code = gen_code()
-    new_exp = next_monday().isoformat()
+    new_exp = next_code_expiry().isoformat()
     res = await db.clients.update_one(
         {"id": client_id},
         {"$set": {"code": new_code, "code_expires_at": new_exp}},
@@ -926,7 +970,7 @@ async def admin_regen_code(client_id: str, _: bool = Depends(require_admin)):
     c = await db.clients.find_one({"id": client_id}, {"_id": 0})
     if c:
         try:
-            await send_code_email(ADMIN_NOTIFY_EMAIL, c["name"], new_code, fmt_expiry(next_monday()))
+            await send_code_email(ADMIN_NOTIFY_EMAIL, c["name"], new_code, fmt_expiry(next_code_expiry()))
         except Exception as e:
             logger.warning("admin email failed: %s", e)
     return {"code": new_code, "code_expires_at": new_exp}
@@ -945,8 +989,8 @@ async def admin_rotation_status(_: bool = Depends(require_admin)):
     return {
         "last_rotated_at": marker.get("rotated_at"),
         "last_rotated_count": marker.get("count"),
-        "rotated_this_week": marker.get("week_start") == week_start().isoformat(),
-        "next_rotation_at": next_monday().isoformat(),
+        "rotated_this_week": marker.get("week_start") == code_week_start().isoformat(),
+        "next_rotation_at": next_code_expiry().isoformat(),
         "last_cron_run": last_run,
         "cron_configured": bool(WEBHOOK_CRON_SECRET),
     }
