@@ -1,5 +1,5 @@
-/* Light-touch palette bridge for existing subscription and client-code flows. Keeps all forms, handlers and routes intact. */
-.App { text-align: center; }
+.App { min-height: 100vh; }
+/* Palette bridge for the existing subscription and client-code flows; handlers and routes are unchanged. */
 [class*='bg-[#0c0d10]'] { background-color: #f7f5ec !important; color: #193127; }
 [class*='bg-[#0c0d10]'] main [class*='text-white'] { color: #193127; }
 [class*='bg-[#0c0d10]'] main [class*='text-white/'] { color: #5c6b60; }
