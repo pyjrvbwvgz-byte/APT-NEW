@@ -1,4 +1,15 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request, UploadFile, File
+from fastapi import (
+    FastAPI,
+    APIRouter,
+    HTTPException,
+    Depends,
+    Header,
+    Request,
+    UploadFile,
+    File,
+    BackgroundTasks,
+)
+import hmac
 from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -47,6 +58,7 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'abpt2025'
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_NOTIFY_EMAIL', 'abpt@apttrains.com')
 ADMIN_SESSION_HOURS = 8
+WEBHOOK_CRON_SECRET = os.environ.get('WEBHOOK_CRON_SECRET')
 
 # Single product: monthly access (€14.99). Defined server-side ONLY.
 SUBSCRIPTION_PRICE = 14.99
@@ -163,17 +175,10 @@ async def startup_seed():
             "days": WEEKLY_TEMPLATE,
             "created_at": now_utc().isoformat(),
         })
-    # spawn auto-rotation background task
-    asyncio.create_task(weekly_rotation_loop())
+    # Weekly code rotation is driven by the platform cron (.emergent/crons.yml
+    # -> POST /api/cron/rotate-codes). A catch-up call also runs whenever an
+    # admin opens the clients list, so a missed fire self-heals.
 
-async def weekly_rotation_loop():
-    """Checks every hour; on Monday auto-rotates codes and emails admin digest (once per week)."""
-    while True:
-        try:
-            await maybe_rotate_codes()
-        except Exception as e:
-            logger.warning("rotation loop error: %s", e)
-        await asyncio.sleep(3600)
 
 async def maybe_rotate_codes(force: bool = False) -> Optional[List[dict]]:
     ws_iso = week_start().isoformat()
@@ -181,7 +186,7 @@ async def maybe_rotate_codes(force: bool = False) -> Optional[List[dict]]:
     if not force and marker and marker.get("week_start") == ws_iso:
         return None  # already rotated this week
     # Only rotate for active non-subscribed clients
-    clients = await db.clients.find({"active": True}, {"_id": 0}).to_list(2000)
+    clients = await db.clients.find({"active": {"$ne": False}}, {"_id": 0}).to_list(2000)
     rotated = []
     new_exp = next_monday().isoformat()
     for c in clients:
@@ -930,6 +935,62 @@ async def admin_regen_code(client_id: str, _: bool = Depends(require_admin)):
 async def admin_rotate_all(_: bool = Depends(require_admin)):
     rotated = await maybe_rotate_codes(force=True)
     return {"rotated": rotated or []}
+
+@api_router.get("/admin/rotation-status")
+async def admin_rotation_status(_: bool = Depends(require_admin)):
+    marker = await db.system.find_one({"key": "last_code_rotation"}, {"_id": 0}) or {}
+    last_run = await db.cron_runs.find_one(
+        {"job": "rotate-codes"}, {"_id": 0}, sort=[("received_at", -1)]
+    )
+    return {
+        "last_rotated_at": marker.get("rotated_at"),
+        "last_rotated_count": marker.get("count"),
+        "rotated_this_week": marker.get("week_start") == week_start().isoformat(),
+        "next_rotation_at": next_monday().isoformat(),
+        "last_cron_run": last_run,
+        "cron_configured": bool(WEBHOOK_CRON_SECRET),
+    }
+
+# ---------- platform cron (weekly code rotation) ----------
+async def run_weekly_rotation(run_id: str):
+    try:
+        rotated = await maybe_rotate_codes(force=True)
+        await db.cron_runs.update_one(
+            {"run_id": run_id},
+            {"$set": {"completed_at": now_utc().isoformat(), "rotated": len(rotated or [])}},
+        )
+    except Exception as e:
+        logger.warning("cron rotation failed: %s", e)
+        await db.cron_runs.update_one({"run_id": run_id}, {"$set": {"error": str(e)}})
+
+@api_router.post("/cron/rotate-codes")
+async def cron_rotate_codes(
+    request: Request,
+    background: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
+    x_webhook_id: Optional[str] = Header(None),
+):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    if not WEBHOOK_CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not hmac.compare_digest(authorization.split(" ", 1)[1], WEBHOOK_CRON_SECRET):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        envelope = await request.json()
+    except Exception:
+        envelope = {}
+    if not isinstance(envelope, dict):
+        raise HTTPException(status_code=400, detail="Invalid webhook body")
+    run_id = x_webhook_id or envelope.get("run_id") or str(uuid.uuid4())
+    if await db.cron_runs.find_one({"run_id": run_id}, {"_id": 0}):
+        return {"ok": True, "duplicate": True, "run_id": run_id}
+    await db.cron_runs.insert_one(
+        {"run_id": run_id, "job": "rotate-codes", "received_at": now_utc().isoformat()}
+    )
+    background.add_task(run_weekly_rotation, run_id)
+    return {"ok": True, "queued": True, "run_id": run_id}
 
 # ---------- per-client menu ----------
 @api_router.get("/admin/clients/{client_id}/menu")
